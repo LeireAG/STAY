@@ -1,0 +1,426 @@
+# Aim: Now I am adding the reworked_annotations_alternative to the vis_mod object. 
+At least here I won't have mixed annotations in the same layer but between layers. I am gonna process each annotation layer separately. This way I can isolate the specific annotation in a layer and correspoding spots (eg. epithelial invasive) to do pairwise comparisons. 
+
+```{r}
+# Load packages
+library(semla)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+```
+
+Load vis_mod object 
+```{r}
+# Load data (Seurat object with corrected image size)
+vis_mod <- readRDS(file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "all_samples_cropped_img.rds"))
+```
+
+```{r}
+#Load annotations
+load_annotations <- function(layer_name) {
+  # List directories where annotation files are stored
+  dirs <- list.dirs("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/hard_vs_soft_coverslip/results/path_annotations/reworked_annotations_alternative",
+                    recursive = FALSE, full.names = TRUE)
+  
+  # Process annotations for each sample section
+  anno.df <- map_dfr(unique(vis_mod$sample_id), function(id) {
+    # Find annotation files matching the current sample and layer
+    fs <- list.files(str_subset(dirs, pattern = paste0(id, "$")), 
+                     pattern = paste0(layer_name, "_reworked.csv"),  # Match specific layer
+                     full.names = TRUE, recursive = TRUE)
+    
+    # Read annotation file (assumes one file per sample per layer)
+    if (length(fs) == 0) {
+      return(NULL)  # Skip if no file found
+    }
+    
+    anno_df <- read_csv(fs)
+    
+    # Ensure consistent column names
+    colnames(anno_df) <- c("barcode", "annotation")  # Adjust if needed
+    
+    # Adjust barcode suffix to match vis_mod
+    suf <- which(unique(vis_mod$sample_id) == id)
+    anno_df <- anno_df %>%
+      mutate(barcode = str_replace(barcode, "\\d+$", as.character(suf)))
+    
+    return(anno_df)
+  })
+  
+  return(anno.df)
+}
+
+```
+
+```{r}
+# Load each annotation layer separately
+epithelial_annotations <- load_annotations("epithelial")
+immune_annotations <- load_annotations("immune")
+stroma_annotations <- load_annotations("stroma")
+```
+
+```{r}
+# Add one layer at a time to the vis_mod Seurat object 
+# Add epithelial annotations
+vis_mod <- AddMetaData(vis_mod, epithelial_annotations %>% column_to_rownames("barcode"), col.name = "Epithelial_Anno")
+
+# Add immune annotations
+vis_mod <- AddMetaData(vis_mod, immune_annotations %>% column_to_rownames("barcode"), col.name = "Immune_Anno")
+
+# Add stroma annotations
+vis_mod <- AddMetaData(vis_mod, stroma_annotations %>% column_to_rownames("barcode"), col.name = "Stroma_Anno")
+```
+
+
+```{r}
+#Because the desmoplastic stroma annotation intermigles with the epithelial layer I am gonna rename as NA
+vis_mod@meta.data <- vis_mod@meta.data %>%
+  mutate(Stroma_Anno = ifelse(Stroma_Anno == "desmoplastic", NA, Stroma_Anno))
+```
+
+```{r}
+#save Seurat object with loaded annotations
+saveRDS(vis_mod,
+        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
+```
+
+
+Load vis_mod object 
+```{r}
+# Load data (new Seurat object modified by Sophie) with my added annotations
+vis_mod <- readRDS(file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
+```
+
+1.QC
+
+```{r}
+#This coerces the Spatial assay into a classic Seurat RNA assay, and stores it as "RNA3" in your object.
+names(vis_mod@assays)
+vis_mod[["RNA3"]] <- as(object = vis_mod[["Spatial"]], Class = "Assay")
+
+names(vis_mod@assays) # check that an additional assay called "RNA3" is created
+```
+
+```{r}
+# Mitochondrial
+mt.genes <- grep(pattern = "^MT-", x = rownames(vis_mod), value = TRUE)
+vis_mod$percent.mito <- (Matrix::colSums(vis_mod@assays$RNA@counts[mt.genes,])/Matrix::colSums(vis_mod@assays$RNA@counts))*100
+head(vis_mod$percent.mito) # There is only 1 to 5% of mitochrondial genes cause these are not included in the 10x gen pannel.
+
+# Ribosomal
+# Collect all genes coding for ribosomal proteins
+rp.genes <- grep(pattern = "^RP[SL]", x = rownames(vis_mod), value = TRUE)
+vis_mod$percent.ribo <- (Matrix::colSums(vis_mod@assays$RNA@counts[rp.genes,])/Matrix::colSums(vis_mod@assays$RNA@counts))*100
+head(vis_mod$percent.ribo)  # There is no ribosomal genes cause these are not included in the 10x gen pannel.
+
+# Percentage hemoglobin genes - includes all genes starting with HB except HBP.
+#Collect hemoglobin protein coding genes
+hemo.genes <- grep(pattern = "^HB[^(P|E|S)]", x = rownames(vis_mod), value = TRUE)
+vis_mod$percent.hemo <- (Matrix::colSums(vis_mod@assays$RNA@counts[hemo.genes,])/Matrix::colSums(vis_mod@assays$RNA@counts))*100
+head(vis_mod$percent.hemo) # The percentage of hemo genes is like 0%
+
+# Percentage for some platelet markers
+plat.genes <- grep(pattern = "PECAM1|PF4", x = rownames(vis_mod), value = TRUE)
+vis_mod$percent.plat <- (Matrix::colSums(vis_mod@assays$RNA@counts[plat.genes,])/Matrix::colSums(vis_mod@assays$RNA@counts))*100
+head(vis_mod$percent.plat) #The percentage is almost 0
+```
+
+Plot QC
+
+```{r, fig.width = 15, fig.height = 8}
+feats <- c("nFeature_Spatial", "nCount_Spatial", "percent.mito", "percent.hemo", "percent.plat")
+QC_all_samples <- VlnPlot(vis_mod, group.by = "sample_id", split.by = "method", features = feats, pt.size = 0.1, ncol = 5)
+```
+
+Plot spatially to understand ViolinPlots
+
+```{r}
+m <- MapFeatures(vis_mod_norm, features = "percent.mito", cols = c("lightgray", "mistyrose", "red", "dark red", "black"), pt.size = 0.1, ncol = 4) #something is happening with the pt.size
+m
+```
+
+
+Yay! Save as PNG 
+```{r}
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/QC_all_samples.png", width = 15*png_res, height = 8*png_res, res = png_res);print(QC_all_samples);dev.off()
+```
+
+#### Save object
+
+```{r}
+saveRDS(vis_mod,
+        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno_QC.rds"))
+```
+
+2. Normalize Data and Find Variable Genes. 
+```{r}
+# Normalize data and find top variable features
+vis_mod_norm <- vis_mod |> 
+  NormalizeData() |> 
+#We need to define which features/genes are important in our dataset
+  FindVariableFeatures()
+```
+Scaling the data by centering the data and scaling (Z-score)
+
+```{r}
+#Since each gene has a different expression level, it means that genes with higher expression values will naturally have higher variation that will be captured by PCA. This means that we need to somehow give each gene a similar weight when performing PCA
+vis_mod_norm <- ScaleData(vis_mod_norm)
+```
+
+3. Dimensionality reduction Run PCA() on variable genes to capture main sources of variation
+
+```{r}
+vis_mod_norm <- RunPCA(vis_mod_norm, npcs = 50, verbose = F)
+```
+
+```{r}
+ElbowPlot(vis_mod_norm) #which help you determine how many PCs actually capture meaningful biological variation (often 10–30).
+```
+Run UMAP
+
+```{r}
+vis_mod_norm <- RunUMAP(
+  vis_mod_norm,
+  reduction = "pca",
+  dims = 1:10, #if elbow plot suggested 10 PCs!
+  n.components = 2,
+  n.neighbors = 50,
+  min.dist = 0.2,
+  verbose = TRUE
+)
+# see ?RunUMAP for more info
+```
+Visualize UMAP
+
+```{r}
+UMAP <- DimPlot(
+  vis_mod_norm,
+  reduction = "umap",
+  group.by = "sample_id"
+) + ggplot2::ggtitle("UMAP on PCA")
+```
+Yay! Save as PNG 
+```{r}
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/UMAP.png", width = 15*png_res, height = 8*png_res, res = png_res);print(UMAP);dev.off()
+```
+
+Testing if normalizing and scaling helps at all. It did!!! Same scale :D
+```{r}
+KRT5_plot <- MapFeatures(vis_mod_norm,
+            colors = RColorBrewer::brewer.pal(n = 9, name = "Reds"),
+            feature = "KRT5", 
+            image_use = "raw",
+            ncol = 4,
+            pt_alpha = 0.5,
+            scale_alpha = FALSE, 
+            max_cutoff = 0.95,
+            add_scalebar = T, scalebar_position = c(0.8,0.9),
+            pt_stroke = NA,
+            pt_size = 1,
+            slot = "counts")
+```
+
+Yay! Save as PNG 
+```{r}
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/KRT5_plot_on_scaled_data.png", width = 15*png_res, height = 8*png_res, res = png_res);print(KRT5_plot);dev.off()
+```
+
+#### Save object vis_mod_anno_QC_normalized 
+
+```{r}
+saveRDS(vis_mod_norm,
+        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/new_object/", "vis_mod_norm.rds"))
+```
+
+Trying mapping annotations on tissue 
+```{r}
+annotation_colors <- c('#ffe119', '#46f0f0',"#eeeeee")
+# Here we use the & operator from the patchwork R package to add a theme
+# You can find more details in the 'advanced' tutorial
+MapLabels(vis_mod, column_name = "Stroma_Anno", colors = annotation_colors, pt_size = 1.3, pt_alpha = 0.5, section_number = 8, ncol = 1) &
+  theme(legend.position = "right")
+
+p <- MapLabels(vis_mod, column_name = "Immune_Anno", pt_size = 1.3, pt_alpha = 0.5, section_number = 8, ncol = 1) &
+  theme(legend.position = "right")
+print(p)
+```
+
+```{r}
+# Here we use the & operator from the patchwork R package to add a theme
+# You can find more details in the 'advanced' tutorial
+MapLabels(vis_mod, column_name = "Stroma_Anno", pt_size = 1.3, pt_alpha = 0.5, colors = annotation_colors, section_number = 7, ncol = 1) &
+  theme(legend.position = "right")
+```
+
+```{r}
+annotation_colors <- c('#ffe119', '#46f0f0',"#eeeeee")
+# Here we use the & operator from the patchwork R package to add a theme
+# You can find more details in the 'advanced' tutorial
+MapLabels(vis_mod, column_name = "Stroma_Anno", pt_size = 1.3, pt_alpha = 0.5, colors = annotation_colors, section_number = 1, ncol = 1) &
+  theme(legend.position = "right")
+```
+
+```{r}
+annotation_colors <- c('#ffe119', '#46f0f0',"#eeeeee")
+# Here we use the & operator from the patchwork R package to add a theme
+# You can find more details in the 'advanced' tutorial
+MapLabels(vis_mod, column_name = "Stroma_Anno", pt_size = 1.3, pt_alpha = 0.5, colors = annotation_colors, section_number = 2, ncol = 1) &
+  theme(legend.position = "right")
+```
+
+```{r}
+annotation_colors <- c('#ffe119', '#46f0f0',"#eeeeee")
+# Here we use the & operator from the patchwork R package to add a theme
+# You can find more details in the 'advanced' tutorial
+MapLabels(vis_mod, column_name = "Stroma_Anno", colors = annotation_colors, pt_size = 2, pt_alpha = 0.5, section_number = 3, ncol = 1) &
+  theme(legend.position = "right")
+```
+
+```{r}
+annotation_colors <- c('#ffe119', '#46f0f0',"#eeeeee")
+# Here we use the & operator from the patchwork R package to add a theme
+# You can find more details in the 'advanced' tutorial
+MapLabels(vis_mod, column_name = "Stroma_Anno", pt_size = 2, pt_alpha = 0.5, colors = annotation_colors, section_number = 4, ncol = 1) &
+  theme(legend.position = "right")
+```
+```{r}
+annotation_colors <- c('#ffe119', '#46f0f0',"#eeeeee")
+# Here we use the & operator from the patchwork R package to add a theme
+# You can find more details in the 'advanced' tutorial
+MapLabels(vis_mod, column_name = "Stroma_Anno", pt_size = 2, pt_alpha = 0.5, colors = annotation_colors, section_number = 5, ncol = 1) &
+  theme(legend.position = "right")
+```
+
+```{r}
+annotation_colors <- c('#ffe119', '#46f0f0',"#eeeeee")
+# Here we use the & operator from the patchwork R package to add a theme
+# You can find more details in the 'advanced' tutorial
+MapLabels(vis_mod, column_name = "Stroma_Anno", pt_size = 2, pt_alpha = 0.5, colors = annotation_colors, section_number = 6, ncol = 1) &
+  theme(legend.position = "right")
+```
+Let's see how the epithelial and immune annotation looks like 
+
+```{r}
+# Here we use the & operator from the patchwork R package to add a theme
+# You can find more details in the 'advanced' tutorial
+MapLabels(vis_mod, column_name = "Epithelial_Anno", ncol = 4) &
+  theme(legend.position = "right")
+```
+
+```{r}
+# Here we use the & operator from the patchwork R package to add a theme
+# You can find more details in the 'advanced' tutorial
+MapLabels(vis_mod, column_name = "Immune_Anno", ncol = 4) &
+  theme(legend.position = "right")
+```
+
+```{r}
+# Define a named vector linking section_id to method
+method_map <- c("4335_3D_R1L_s1" = "hard_cover", 
+                "4335_3D_R1L_s2" = "soft_cover",
+                "4393_2H_R1S" = "soft_cover", 
+                "4393_2H_R1S_rep" = "hard_cover", 
+                "4419_3F_R1S" = "soft_cover", 
+                "4419_3F_R1S_rep" = "hard_cover",
+                "4515_4L_R1L" = "soft_cover",
+                "4515_4L_R1L_rep" = "hard_cover")
+                
+# Assign method dynamically based on section_id in vis_mod
+vis_mod@meta.data$method <- method_map[vis_mod@meta.data$sample_id]
+
+# Check if order is consistent
+table(vis_mod@meta.data$method)
+table(vis_mod@meta.data$sample_id, vis_mod@meta.data$method)
+
+# Use the following code to reorder the section_id
+
+
+vis_mod@meta.data$sample_id <- factor(vis_mod@meta.data$sample_id, 
+                                       levels = c("4335_3D_R1L_s1", 
+                                                  "4335_3D_R1L_s2", 
+                                                  "4393_2H_R1S_rep", 
+                                                  "4393_2H_R1S", 
+                                                  "4419_3F_R1S_rep", 
+                                                  "4419_3F_R1S", 
+                                                  "4515_4L_R1L_rep", 
+                                                  "4515_4L_R1L"))
+# Check if order is consistent
+table(vis_mod@meta.data$sample_id, vis_mod@meta.data$method)
+```
+
+#### Save vis_mod object with annotations and method
+
+```{r}
+saveRDS(vis_mod,
+        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
+```
+
+
+Violin plots per layer 
+Epithelial 
+
+```{r}
+vis_mod_ano <- readRDS(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_ano.rds"))
+```
+
+```{r}
+# Subset based on the annotation using an expession
+vis_mod_epithelial <- SubsetSTData(vis_mod, expression = Epithelial_Anno %in% c("invasive", "in_situ", "normal"))
+```
+
+```{r}
+# Now, plot.df1 will contain the metadata with epithelial anno, method, and sample_id columns as factors, alongside the newly created log_nCount column. You can then use this plot.df1 data frame for plotting or further analysis.
+plot.df1 <- vis_mod_epithelial@meta.data %>% 
+  mutate(
+    log_nCount = log1p(nCount_Spatial),
+    Epithelial_Anno = as.factor(Epithelial_Anno),
+    method = as.factor(method),
+    sample_id = as.factor(sample_id)
+  )
+#str(plot.df1): Displays the structure of plot.df1, showing each column's name, data type (e.g., factor, numeric, etc.), and a preview of its values.
+```
+
+```{r}
+p <- ggplot(vis_mod_epithelial@meta.data, aes(y = nCount_Spatial, x = sample_id, fill = method)) +
+  geom_violin(trim = FALSE, scale = "width") +
+  scale_y_log10() +
+  labs(title = "Log-transformed UMI Count Distribution in Epithelial Layer",
+       x = "Sample ID",
+       y = "Log-transformed UMI Count") +
+  geom_boxplot(width = 0.1, outlier.shape = NA) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p)
+
+```
+
+
+```{r}
+# Filter the data to include only one block and using grouped annotations
+  plot.df.4515 <- plot.df1.group %>% 
+  filter(block_id %in% c("4515_4L_R1L")) # Focus on block 4515
+# Plot the data using the filtered grouped annotations for all sections
+ggplot(plot.df.4515, aes(x = grouped_annotation, y = nCount_Spatial, fill = method)) +
+  geom_violin(trim = FALSE, scale = "width", width = 0.7) +  
+  facet_wrap(~ block_id, ncol = 2) +  # Facet by block_id
+  scale_y_log10() +  # Log-transform y-axis
+  theme_minimal() +  # Clean up the plot appearance
+  labs(title = "Comparison of UMI Counts by Annotation and Method",
+       y = "UMI Counts", x = "Annotation") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16),  # Increase title size
+    axis.title = element_text(size = 14),  # Increase axis title size
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),  # Rotate x-axis labels and increase size
+    axis.text.y = element_text(size = 12),  # Increase y-axis text size
+    legend.position = "right",  # Position legend on the right
+    strip.text = element_text(size = 14)  # Increase facet label size
+  ) 
+```
+
+
+
+

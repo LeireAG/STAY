@@ -1,0 +1,227 @@
+---
+title: "supplementary_figs_4_to_12"
+Aim: Visualizing the 23 factors from figure 4 spatially for all sections
+---
+
+```{r}
+#Load packages
+library(semla)
+library(singlet)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+```
+
+A parentesis here to copy the R environment from local to the server when working with big datasets
+```{r}
+p <- getwd()
+print(p)
+```
+```{r}
+setwd("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/code/corrected_code/clean_code/figures")
+```
+
+```{r}
+renv::init()
+# If already initialized:
+renv::snapshot()
+```
+--------------------------------------------------------------------------------------
+```{r, eval = FALSE}
+#Load Seurat object with the NMF factors 
+vis_mod_nmf <- readRDS(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_nmf.rds"))
+```
+
+# Making it a bit easier to visualize plotting all factors in the different sections one by one generatng one file per section
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4335_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/4335_hard_NMF.pdf"
+pdf(file = pdf_4335_hard, width = 20, height = 30)
+p1 <- MapFeatures(vis_mod_nmf, 
+            section_number = 1,
+            features = paste0("NMF_", 1:23), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+#print(p1)
+#dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4335_hard_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4335_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/4335_soft_NMF.pdf"
+pdf(file = pdf_4335_soft, width = 20, height = 30)
+p1 <- MapFeatures(vis_mod_nmf, 
+            section_number = 2,
+            features = paste0("NMF_", 1:23), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+#print(p1)
+#dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4335_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4393_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/4393_soft_NMF.pdf"
+pdf(file = pdf_4393_soft, width = 20, height = 30)
+p1 <- MapFeatures(vis_mod_nmf, 
+            section_number = 3,
+            features = paste0("NMF_", 1:23), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1.3,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+#print(p1)
+#dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4393_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4393_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/4393_hard_NMF.pdf"
+pdf(file = pdf_4393_hard, width = 20, height = 30)
+p1 <- MapFeatures(vis_mod_nmf, 
+            section_number = 4,
+            features = paste0("NMF_", 1:23), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1.3,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+#print(p1)
+#dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4393_hard_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4419_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/4419_soft_NMF.pdf"
+pdf(file = pdf_4419_soft, width = 20, height = 30)
+p1 <- MapFeatures(vis_mod_nmf, 
+            section_number = 5,
+            features = paste0("NMF_", 1:23), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1.3,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+#print(p1)
+#dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4419_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4419_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/4419_hard_NMF.pdf"
+pdf(file = pdf_4419_hard, width = 20, height = 30)
+p1 <- MapFeatures(vis_mod_nmf, 
+            section_number = 6,
+            features = paste0("NMF_", 1:23), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1.3,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+#print(p1)
+#dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4419_hard_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4515_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/4515_soft_NMF.pdf"
+pdf(file = pdf_4515_soft, width = 20, height = 30)
+p1 <- MapFeatures(vis_mod_nmf, 
+            section_number = 7,
+            features = paste0("NMF_", 1:23), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+#print(p1)
+#dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4515_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4515_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/4515_hard_NMF.pdf"
+pdf(file = pdf_4515_hard, width = 20, height = 30)
+p8 <- MapFeatures(vis_mod_nmf, 
+            section_number = 8,
+            features = paste0("NMF_", 1:23), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+print(p1)
+dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4515_hard_NMF_w14_h25.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p8);dev.off()
+```
+
+#Next, one can investigate the feature loadings of contribution of each gene to each factor \##### Plot Feature loadings
+
+```{r plot_NMF_features, fig.width=14, fig.height=15}
+#Explore gene contributions to each factor
+selected_factors <- c(11, 14, 16, 20)
+p <- PlotFeatureLoadings(vis_mod_nmf, 
+                    dims = 1:23, 
+                    reduction = "nmf", 
+                    nfeatures = 15,
+                    mode = "dotplot", 
+                    fill = "darkmagenta",
+                    pt_size = 3,
+                    ncols = 5)
+pdf(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5", "/vis_mod_NMF_feature_loading", ".pdf"), width = 14, height = 15)
+print(p)
+dev.off()
+```
+
+# Explore gene contributions (heatmap). Supplementary figure 12.
+
+```{r fig.width=14, fig.height=25}
+p1 <- PlotFeatureLoadings(vis_mod_nmf, 
+                    dims = 1:23, 
+                    reduction = "nmf", 
+                    nfeatures = 15, 
+                    mode = "heatmap", 
+                    gradient_colors = viridis::magma(n = 11, direction = -1))
+print(p1)
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/gene_loading_heatmap.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+```

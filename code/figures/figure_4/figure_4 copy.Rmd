@@ -1,0 +1,767 @@
+---
+title: "figure_4"
+Aim: investigating areas of detachment by Non-Negative Matrix factorization and deconvolution with the NNLS method
+Figure 4 has changed to reflect the cancer biology in the paper 
+I am displaying deconvolution results and NMF
+I am saving high res images as a PNG in Figure_5/deconv/
+---
+
+```{r}
+library(semla)
+library(singlet)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+```
+
+1. Run NMF the normalized Seurat object but excluding reductions. 
+```{r}
+# Normalize data and find top variable features
+vis_mod_norm <- vis_mod |> 
+  NormalizeData() |> 
+  FindVariableFeatures()
+```
+
+```{r}
+## Run NMF
+set.seed(42)
+vis_mod_nmf <- RunNMF(vis_mod_norm, assay = "RNA3") #k = 20 (if I want exactly 20 factors)
+```
+
+
+```{r}
+#### Save object
+saveRDS(vis_mod_nmf,
+        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_nmf.rds"))
+```
+
+2. Run deconvolution on this object using the semla deconvolution script save and load. 
+
+```{r, eval = FALSE}
+vis_mod_nmf <- readRDS(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/new_object/corrected_object/", "vis_mod_nmf_decon.rds"))
+```
+
+```{r}
+#### Check optimal number of factors k
+k <- ncol(vis_mod_nmf@reductions$nmf@feature.loadings)
+k
+```
+
+```{r}
+#### Print factorization rank
+#pdf(paste0(plot.dir, "/RankPlot_nmf", ".pdf"), width = 25, height = 12)
+print(RankPlot(vis_mod_nmf))
+#dev.off()
+```
+
+```{r plot_NMF_features, fig.width=14, fig.height=15}
+#Explore gene contributions to each factor
+k <- ncol(deconv@reductions$nmf@feature.loadings)
+k
+p <- PlotFeatureLoadings(deconv, 
+                    dims = 1:k, 
+                    reduction = "nmf", 
+                    nfeatures = 15,
+                    mode = "dotplot", 
+                    fill = "darkmagenta",
+                    pt_size = 3,
+                    ncols = 5)
+p
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/vis_mod_NMF_feature_loading.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p);dev.off()
+
+pdf(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/vis_mod_NMF_feature_loading", ".pdf"), width = 14, height = 15)
+print(p)
+dev.off()
+```
+
+Functional Enrichment Analysis to indentify the gene ontology of the gene programmes in each factor
+```{r}
+#Extract feature loadings from DimReduc object for each factor to run Func Enrich Analysis
+nmf_loadings <- vis_mod_nmf[["nmf"]]@feature.loadings
+
+# Convert to long format and group data by factor
+gene_loadings_sorted <- nmf_loadings |> 
+  as.data.frame() |> 
+  tibble::rownames_to_column(var = "gene") |> 
+  as_tibble() |> 
+  tidyr::pivot_longer(all_of(colnames(nmf_loadings)), names_to = "fctr", values_to = "loading") |> 
+  mutate(fctr = factor(fctr, colnames(nmf_loadings))) |> 
+  group_by(fctr) |> 
+  arrange(fctr, -loading)
+
+# Extract top 10 genes per factor
+gene_loadings_sorted |> 
+  slice_head(n = 10)
+```
+
+Supplementary figure <- # Visualize gene contributions (heatmap)
+```{r fig.width=14, fig.height=25}
+p1 <- PlotFeatureLoadings(vis_mod_nmf, 
+                    dims = 1:k, 
+                    reduction = "nmf", 
+                    nfeatures = 15, 
+                    mode = "heatmap", 
+                    gradient_colors = viridis::magma(n = 11, direction = -1))
+print(p1)
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/gene_loadings_heatmap.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+```
+## Run functional enrichment analysis on top 10 genes from all factors 
+
+```{r}
+library(gprofiler2)
+
+
+# Loop through all 24 NMF factors
+for (i in 1:24) {
+  factor_name <- paste0("NMF_", i)
+  cat("\n==========", factor_name, "==========\n")
+  
+  # Get top 10 genes for the current factor
+  gene_set <- gene_loadings_sorted |> 
+    filter(fctr == factor_name) |> 
+    slice_head(n = 10)
+  
+  # Run GO enrichment and show only top term
+  result <- tryCatch({
+    fea <- gost(query = gene_set$gene,
+                ordered_query = TRUE,
+                organism = "hsapiens",
+                sources = "GO:BP")
+    
+    if (!is.null(fea$result) && nrow(fea$result) > 0) {
+      top_term <- fea$result[1, ]
+      cat("Top GO term:\n")
+      cat("- Name: ", top_term$term_name, "\n")
+      cat("- p-value: ", signif(top_term$p_value, 3), "\n")
+      cat("- Intersection size: ", top_term$intersection_size, "/", top_term$query_size, "\n")
+    } else {
+      cat("No GO term enrichment found.\n")
+    }
+  }, error = function(e) {
+    cat("Error:", e$message, "\n")
+  })
+}
+
+```
+
+Visualization of factors spatially 
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4335_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4335_hard_NMF.pdf"
+pdf(file = pdf_4335_hard, width = 20, height = 30)
+p1 <- MapFeatures(vis_mod_nmf, 
+            section_number = 1,
+            features = paste0("NMF_", 1:k), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+print(p1)
+dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4335_hard_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4335_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4335_soft_NMF.pdf"
+pdf(file = pdf_4335_soft, width = 20, height = 30)
+p2 <- MapFeatures(vis_mod_nmf, 
+            section_number = 2,
+            features = paste0("NMF_", 1:k), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+print(p2)
+dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4335_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p2);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4393_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4393_soft_NMF.pdf"
+pdf(file = pdf_4393_soft, width = 20, height = 30)
+p3 <- MapFeatures(vis_mod_nmf, 
+            section_number = 3,
+            features = paste0("NMF_", 1:k), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1.3,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+print(p3)
+dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4393_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p3);dev.off()
+```
+
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4393_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4393_hard_NMF.pdf"
+pdf(file = pdf_4393_hard, width = 20, height = 30)
+p4 <- MapFeatures(vis_mod_nmf, 
+            section_number = 4,
+            features = paste0("NMF_", 1:k), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1.3,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+print(p4)
+dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4393_hard_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p4);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4419_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4419_soft_NMF.pdf"
+pdf(file = pdf_4419_soft, width = 20, height = 30)
+p5 <- MapFeatures(vis_mod_nmf, 
+            section_number = 5,
+            features = paste0("NMF_", 1:k), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1.3,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+print(p5)
+dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4419_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p5);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4419_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4419_hard_NMF.pdf"
+pdf(file = pdf_4419_hard, width = 20, height = 30)
+p6 <- MapFeatures(vis_mod_nmf, 
+            section_number = 6,
+            features = paste0("NMF_", 1:k), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1.3,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+print(p6)
+dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4419_hard_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p6);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4515_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4515_soft_NMF.pdf"
+pdf(file = pdf_4515_soft, width = 20, height = 30)
+p7 <- MapFeatures(vis_mod_nmf, 
+            section_number = 7,
+            features = paste0("NMF_", 1:k), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+print(p7)
+dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4515_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p7);dev.off()
+```
+
+```{r plot_NMF, fig.width=14, fig.height=25}
+pdf_4515_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4515_hard_NMF.pdf"
+pdf(file = pdf_4515_hard, width = 20, height = 30)
+p8 <- MapFeatures(vis_mod_nmf, 
+            section_number = 8,
+            features = paste0("NMF_", 1:k), 
+            override_plot_dims = TRUE, 
+            ncol = 5,
+            pt_size = 1,
+            pt_stroke = NA,
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+
+print(p8)
+dev.off()
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4515_hard_NMF_w14_h25.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p8);dev.off()
+```
+
+Plot deconv results and nmf with the correct scales 0 to 1 and 0 to max. Select the factors that match biology. 
+
+```{r}
+deconv <- readRDS(file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/new_object/corrected_object/", "vis_mod_nmf_decon.rds"))
+```
+
+### plot celltypes over factors figure 4 e. 
+```{r}
+DefaultAssay(deconv) <- "garvan_major_map"
+# Calculate Spearman correlation between NMF factors and cell types
+nmf_matrix <- deconv@reductions$nmf@cell.embeddings
+celltypes_major <- rownames(deconv@assays$garvan_major_map@data)
+celltype_matrix <- FetchData(deconv, layer = "data", assay = DefaultAssay(deconv), vars = celltypes_major)
+# Ensure both matrices have shared rownames
+shared_rownames <- intersect(rownames(nmf_matrix), rownames(celltype_matrix))
+nmf_matrix <- nmf_matrix[shared_rownames, , drop = FALSE]
+celltype_matrix <- celltype_matrix[shared_rownames, , drop = FALSE]
+correlation_matrix <- cor(nmf_matrix, celltype_matrix, method = "spearman")
+
+pdf("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/nmf_major_celltype_correlation.pdf", width = 10, height = 10)
+    heatmap3(correlation_matrix, 
+    margins = c(12, 10))
+dev.off()
+```
+
+Starting plotting patient 4 - STAY
+
+```{r width = 8, height = 6}
+# Setp 1: Plot selected cell types
+DefaultAssay(deconv) <- "garvan_major_map"
+selected_celltypes <- c("B-cells")
+# Step 2: Plot with consistent visible color scale
+pastel_turbo <- adjustcolor(viridis::turbo(11), alpha.f = 1, red.f = 1.2, green.f = 1.2, blue.f = 1.2)
+
+p_Bcells_4515_hard <- lapply(seq_along(selected_celltypes), function(i) {
+  MapFeatures(deconv, pt_size = 1.3,
+            features = selected_celltypes[i], 
+            colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
+            section_number = 8,
+            max_cutoff = 0.99,
+            #ncol = 4,
+            override_plot_dims = TRUE) + 
+    scale_fill_gradientn(
+      #colours = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
+      colours = pastel_turbo,
+      limits = c(0, 1),
+      name = "Cell\nfraction"
+    ) +
+    theme(plot.title = element_blank(), 
+          legend.position = "right",
+          legend.text = element_text(angle = 0))
+}) |> setNames(nm = selected_celltypes)
+
+print(p_Bcells_4515_hard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Bcells_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_Bcells_4515_hard);dev.off()
+```
+
+```{r width = 8, height = 6}
+# Step 1: Get the global max of all factor values
+max_nmf_value <- max(deconv@reductions$nmf@cell.embeddings)
+
+#trying to map NMF
+p_NMF11_4515_hard <- MapFeatures(deconv, 
+            features = paste0("NMF_", 11),
+            section_number = 8,
+            override_plot_dims = TRUE, 
+            pt_size = 1.3, 
+            max_cutoff = 0.99,
+            #alpha = 0.8,
+            #scale = c("shared"),
+            colors = viridis::magma(n = 11, direction = -1)) &
+  scale_fill_gradientn(
+    colors = viridis::magma(n = 11, direction = -1),
+    #limits = c(0, max_nmf_value),
+    name = "Factor\nactivity"  # Or just name = NULL if you want to remove it
+  ) & 
+  theme(
+    plot.title = element_blank(), 
+    legend.position = "right",
+    legend.text = element_text(angle = 0)
+  )
+
+print(p_NMF11_4515_hard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_11_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF11_4515_hard);dev.off()
+```
+
+```{r width = 8, height = 6}
+# Plot selected cell types
+
+DefaultAssay(deconv) <- "garvan_major_map"
+selected_celltypes <- c("Plasmablasts")
+p_plasma_4515_hard <- lapply(seq_along(selected_celltypes), function(i) {
+  MapFeatures(deconv, pt_size = 1.3,
+            features = selected_celltypes[i], 
+            colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
+            section_number = 8,
+            max_cutoff = 0.99,
+            #ncol = 4,
+            override_plot_dims = TRUE) + 
+    scale_fill_gradientn(
+      #colours = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
+      colors = pastel_turbo, 
+      limits = c(0, 1),
+      name = "Cell\nfraction"
+    ) +
+    theme(plot.title = element_blank(), 
+          legend.position = "right",
+          legend.text = element_text(angle = 0))
+}) |> setNames(nm = selected_celltypes)
+print(p_plasma_4515_hard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Plasmablasts_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_plasma_4515_hard);dev.off()
+```
+
+```{r width = 8, height = 6}
+#trying to map NMF
+p_NMF21_4515_hard <- MapFeatures(deconv, 
+            features = paste0("NMF_", 21),
+            section_number = 8,
+            override_plot_dims = TRUE, 
+            pt_size = 1.3, 
+            max_cutoff = 0.99,
+            #alpha = 0.8,
+            #scale = c("shared"),
+            colors = viridis::magma(n = 11, direction = -1)) &
+  scale_fill_gradientn(
+    colors = viridis::magma(n = 11, direction = -1),
+    #limits = c(0, max_nmf_value),
+    name = "Factor\nactivity"  # Or just name = NULL if you want to remove it
+  ) & 
+  theme(
+    plot.title = element_blank(), 
+    legend.position = "right",
+    legend.text = element_text(angle = 0)
+  )
+print(p_NMF21_4515_hard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_21_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF21_4515_hard);dev.off()
+```
+
+```{r width = 8, height = 6}
+# Plot selected cell types
+
+DefaultAssay(deconv) <- "garvan_major_map"
+selected_celltypes <- c("Myeloid")
+p_myeloid_4515_hard <- lapply(seq_along(selected_celltypes), function(i) {
+  MapFeatures(deconv, pt_size = 1.3,
+            features = selected_celltypes[i], 
+            colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
+            section_number = 8,
+            max_cutoff = 0.99,
+            #ncol = 4,
+            override_plot_dims = TRUE) + 
+    scale_fill_gradientn(
+      #colours = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
+      colours = pastel_turbo,
+      limits = c(0, 1),
+      name = "Cell\nfraction"
+    ) +
+    theme(plot.title = element_blank(), 
+          legend.position = "right",
+          legend.text = element_text(angle = 0))
+}) |> setNames(nm = selected_celltypes)
+print(p_myeloid_4515_hard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Myeloid_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_myeloid_4515_hard);dev.off()
+```
+
+```{r width = 8, height = 6}
+#trying to map NMF
+p_NMF10_4515_hard <- MapFeatures(deconv, 
+            features = paste0("NMF_", 10),
+            section_number = 8,
+            override_plot_dims = TRUE, 
+            pt_size = 1.3, 
+            max_cutoff = 0.99,
+            #alpha = 0.8,
+            #scale = c("shared"),
+            colors = viridis::magma(n = 11, direction = -1)) &
+   scale_fill_gradientn(
+    colors = viridis::magma(n = 11, direction = -1),
+    #limits = c(0, max_nmf_value),
+    name = "Factor\nactivity"  # Or just name = NULL if you want to remove it
+  ) & 
+  theme(
+    plot.title = element_blank(), 
+    legend.position = "right",
+    legend.text = element_text(angle = 0)
+  )
+print(p_NMF10_4515_hard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_10_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF10_4515_hard);dev.off()
+```
+
+Starting plotting patient 4 - standard
+
+```{r}
+#test for scale 0 to 1
+selected_celltypes <- c("B-cells")
+p_Bcells_4515_soft <- lapply(seq_along(selected_celltypes), function(i) {
+  MapFeatures(deconv, pt_size = 1.3,
+              features = selected_celltypes[i], 
+              section_number = 7,
+              max_cutoff = 0.99,
+              override_plot_dims = TRUE) +  # use +, not &
+    scale_fill_gradientn(
+      colours = pastel_turbo,
+      limits = c(0, 1),
+      name = "Cell\nfraction"
+    ) +
+    theme(plot.title = element_blank(), 
+          legend.position = "right",
+          legend.text = element_text(angle = 0))
+}) |> setNames(nm = selected_celltypes)
+
+print(p_Bcells_4515_soft)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Bcells_4515_soft.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_Bcells_4515_soft);dev.off()
+
+```
+
+```{r}
+#test for scale 0 to 1
+selected_celltypes <- c("Plasmablasts")
+p_Plasmablast_4515_soft <- lapply(seq_along(selected_celltypes), function(i) {
+  MapFeatures(deconv, pt_size = 1.3,
+              features = selected_celltypes[i], 
+              section_number = 7,
+              max_cutoff = 0.99,
+              override_plot_dims = TRUE) +  # use +, not &
+    scale_fill_gradientn(
+      #colours = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
+      colours = pastel_turbo,
+      limits = c(0, 1),
+      name = "Cell\nfraction"
+    ) +
+    theme(plot.title = element_blank(), 
+          legend.position = "right",
+          legend.text = element_text(angle = 0))
+}) |> setNames(nm = selected_celltypes)
+
+print(p_Plasmablast_4515_soft)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Plasmablast_4515_soft.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_Plasmablast_4515_soft);dev.off()
+
+```
+
+```{r}
+library(ggplot2)
+
+# Step 1: Get the global max of all factor values
+max_nmf_value <- max(deconv@reductions$nmf@cell.embeddings)
+
+# Step 2: Plot with consistent color scale
+pastel_turbo <- adjustcolor(viridis::turbo(100), alpha.f = 1, red.f = 1.2, green.f = 1.2, blue.f = 1.2)
+
+
+test_factor_soft<- MapFeatures(
+  deconv, 
+  features = "NMF_21",
+  section_number = 8,
+  override_plot_dims = TRUE, 
+  pt_size = 1.3, 
+  max_cutoff = 0.99,
+  #colors = viridis::magma(n = 11, direction = -1)
+) & 
+   scale_fill_gradientn(
+  colours = viridis::magma(n = 11, direction = -1),
+  #limits = c(0, max_nmf_value),
+  name = "Factor\nactivity"
+  ) & 
+  theme(
+    plot.title = element_blank(), 
+    legend.position = "right",
+    legend.text = element_text(angle = 0)
+  )
+
+# Optional: save to file
+print(test_factor_soft)
+
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/test_factor21.png", width = 8*png_res, height = 6*png_res, res = png_res);print(test_factor);dev.off()
+
+
+```
+
+```{r width = 8, height = 6}
+# Plot selected cell types
+
+DefaultAssay(deconv) <- "garvan_major_map"
+selected_celltypes <- c("B-cells")
+p_Bcells_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
+  MapFeatures(deconv, pt_size = 1.3,
+            features = selected_celltypes[i], 
+            colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
+            section_number = 7,
+            max_cutoff = 0.99,
+            #ncol = 4,
+            override_plot_dims = TRUE) & 
+  theme(plot.title = element_blank(), 
+        legend.position = "right", legend.text = element_text(angle = 0))
+}) |> setNames(nm = selected_celltypes)
+print(p_Bcells_4515_standard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/deconv/p_Bcells_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_Bcells_4515_standard);dev.off()
+```
+
+```{r width = 8, height = 6}
+#trying to map NMF
+p_NMF11_4515_standard <- MapFeatures(deconv, 
+            features = paste0("NMF_", 11),
+            section_number = 7,
+            override_plot_dims = TRUE, 
+            pt_size = 1.3, 
+            max_cutoff = 0.99,
+            #alpha = 0.8,
+            #scale = c("shared"),
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank(), 
+        legend.position = "right", legend.text = element_text(angle = 0))
+print(p_NMF11_4515_standard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_11_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF11_4515_standard);dev.off()
+```
+
+```{r width = 8, height = 6}
+# Plot selected cell types
+
+DefaultAssay(deconv) <- "garvan_major_map"
+selected_celltypes <- c("Plasmablasts")
+p_plasma_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
+  MapFeatures(deconv, pt_size = 1.3,
+            features = selected_celltypes[i], 
+            colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
+            section_number = 7,
+            max_cutoff = 0.99,
+            #ncol = 4,
+            override_plot_dims = TRUE) & 
+  theme(plot.title = element_blank(), 
+        legend.position = "right", legend.text = element_text(angle = 0))
+}) |> setNames(nm = selected_celltypes)
+print(p_plasma_4515_standard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/deconv/p_Plasmablasts_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_plasma_4515_standard);dev.off()
+```
+
+```{r width = 8, height = 6}
+#trying to map NMF
+p_NMF21_4515_standard <- MapFeatures(deconv, 
+            features = paste0("NMF_", 21),
+            section_number = 7,
+            override_plot_dims = TRUE, 
+            pt_size = 1.3, 
+            max_cutoff = 0.99,
+            #alpha = 0.8,
+            #scale = c("shared"),
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank(), 
+        legend.position = "right", legend.text = element_text(angle = 0))
+print(p_NMF21_4515_standard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_21_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF21_4515_standard);dev.off()
+```
+
+```{r width = 8, height = 6}
+# Plot selected cell types
+
+DefaultAssay(deconv) <- "garvan_major_map"
+selected_celltypes <- c("Myeloid")
+p_myeloid_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
+  MapFeatures(deconv, pt_size = 1.3,
+            features = selected_celltypes[i], 
+            colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
+            section_number = 7,
+            max_cutoff = 0.99,
+            #ncol = 4,
+            override_plot_dims = TRUE) +  # use +, not &
+    scale_fill_gradientn(
+      colours = pastel_turbo,
+      limits = c(0, 1),
+      name = "Cell\nfraction"
+    ) +
+    theme(plot.title = element_blank(), 
+          legend.position = "right",
+          legend.text = element_text(angle = 0))
+}) |> setNames(nm = selected_celltypes)
+
+print(p_myeloid_4515_standard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Myeloid_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_myeloid_4515_standard);dev.off()
+```
+
+
+```{r width = 8, height = 6}
+#trying to map NMF
+p_NMF10_4515_standard <- MapFeatures(deconv, 
+            features = paste0("NMF_", 10),
+            section_number = 7,
+            override_plot_dims = TRUE, 
+            pt_size = 1.3, 
+            max_cutoff = 0.99,
+            #alpha = 0.8,
+            #scale = c("shared"),
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank(), 
+        legend.position = "right", legend.text = element_text(angle = 0))
+print(p_NMF10_4515_standard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_10_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF10_4515_standard);dev.off()
+```
+
+```{r width = 8, height = 6}
+# Plot selected cell types
+
+DefaultAssay(deconv) <- "garvan_major_map"
+selected_celltypes <- c("T-cells")
+p_Tcells_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
+  MapFeatures(deconv, pt_size = 1.3,
+            features = selected_celltypes[i], 
+            colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
+            section_number = 7,
+            max_cutoff = 0.99,
+            #ncol = 4,
+            override_plot_dims = TRUE) +  # use +, not &
+    scale_fill_gradientn(
+      colours = pastel_turbo,
+      limits = c(0, 1),
+      name = "Cell\nfraction"
+    ) +
+    theme(plot.title = element_blank(), 
+          legend.position = "right",
+          legend.text = element_text(angle = 0))
+}) |> setNames(nm = selected_celltypes)
+
+print(p_Tcells_4515_standard)
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Myeloid_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_myeloid_4515_standard);dev.off()
+```
+

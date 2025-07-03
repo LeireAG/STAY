@@ -1,0 +1,164 @@
+# Aim: Quality control, normalization and scaling of the data
+
+```{r}
+# Load packages
+library(semla)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+```
+
+
+```{r}
+# Load data (Seurat object with corrected image size and path annotations) 
+vis_mod <- readRDS(file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
+```
+
+1.QC
+
+```{r}
+#This coerces the Spatial assay into a classic Seurat RNA assay, and stores it as "RNA3" in your object.
+names(vis_mod@assays)
+vis_mod[["RNA3"]] <- as(object = vis_mod[["Spatial"]], Class = "Assay")
+
+names(vis_mod@assays) # check that an additional assay called "RNA3" is created
+```
+
+```{r}
+# Mitochondrial
+mt.genes <- grep(pattern = "^MT-", x = rownames(vis_mod), value = TRUE)
+vis_mod$percent.mito <- (Matrix::colSums(vis_mod@assays$RNA@counts[mt.genes,])/Matrix::colSums(vis_mod@assays$RNA@counts))*100
+head(vis_mod$percent.mito) # There is only 1 to 5% of mitochrondial genes cause these are not included in the 10x gen pannel.
+
+# Ribosomal
+# Collect all genes coding for ribosomal proteins
+rp.genes <- grep(pattern = "^RP[SL]", x = rownames(vis_mod), value = TRUE)
+vis_mod$percent.ribo <- (Matrix::colSums(vis_mod@assays$RNA@counts[rp.genes,])/Matrix::colSums(vis_mod@assays$RNA@counts))*100
+head(vis_mod$percent.ribo)  # There is no ribosomal genes cause these are not included in the 10x gen pannel.
+
+# Percentage hemoglobin genes - includes all genes starting with HB except HBP.
+#Collect hemoglobin protein coding genes
+hemo.genes <- grep(pattern = "^HB[^(P|E|S)]", x = rownames(vis_mod), value = TRUE)
+vis_mod$percent.hemo <- (Matrix::colSums(vis_mod@assays$RNA@counts[hemo.genes,])/Matrix::colSums(vis_mod@assays$RNA@counts))*100
+head(vis_mod$percent.hemo) # The percentage of hemo genes is like 0%
+
+# Percentage for some platelet markers
+plat.genes <- grep(pattern = "PECAM1|PF4", x = rownames(vis_mod), value = TRUE)
+vis_mod$percent.plat <- (Matrix::colSums(vis_mod@assays$RNA@counts[plat.genes,])/Matrix::colSums(vis_mod@assays$RNA@counts))*100
+head(vis_mod$percent.plat) #The percentage is almost 0
+```
+
+Plot QC
+
+```{r, fig.width = 15, fig.height = 8}
+feats <- c("nFeature_Spatial", "nCount_Spatial", "percent.mito", "percent.hemo", "percent.plat")
+QC_all_samples <- VlnPlot(vis_mod, group.by = "sample_id", split.by = "method", features = feats, pt.size = 0.1, ncol = 5)
+```
+
+Plot spatially to understand ViolinPlots
+
+```{r}
+m <- MapFeatures(vis_mod_norm, features = "percent.mito", cols = c("lightgray", "mistyrose", "red", "dark red", "black"), pt.size = 0.1, ncol = 4) #something is happening with the pt.size
+m
+```
+
+
+Yay! Save as PNG 
+```{r}
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/QC_all_samples.png", width = 15*png_res, height = 8*png_res, res = png_res);print(QC_all_samples);dev.off()
+```
+
+#### Save object
+
+```{r}
+saveRDS(vis_mod,
+        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno_QC.rds"))
+```
+
+2. Normalize Data and Find Variable Genes. 
+```{r}
+# Normalize data and find top variable features
+vis_mod_norm <- vis_mod |> 
+  NormalizeData() |> 
+#We need to define which features/genes are important in our dataset to perform PCA or clustering not necessary here. 
+  #FindVariableFeatures()
+```
+
+Scaling the data by centering the data and scaling (Z-score)
+
+```{r}
+#Since each gene has a different expression level, it means that genes with higher expression values will naturally have higher variation that will be captured by PCA. This means that we need to somehow give each gene a similar weight when performing PCA
+vis_mod_norm <- ScaleData(vis_mod_norm)
+```
+
+3. Dimensionality reduction Run PCA() on variable genes to capture main sources of variation
+
+```{r}
+vis_mod_norm <- RunPCA(vis_mod_norm, npcs = 50, verbose = F)
+```
+
+```{r}
+ElbowPlot(vis_mod_norm) #which help you determine how many PCs actually capture meaningful biological variation (often 10–30).
+```
+
+Run UMAP
+
+```{r}
+vis_mod_norm <- RunUMAP(
+  vis_mod_norm,
+  reduction = "pca",
+  dims = 1:10, #if elbow plot suggested 10 PCs!
+  n.components = 2,
+  n.neighbors = 50,
+  min.dist = 0.2,
+  verbose = TRUE
+)
+# see ?RunUMAP for more info
+```
+
+Visualize UMAP
+
+```{r}
+UMAP <- DimPlot(
+  vis_mod_norm,
+  reduction = "umap",
+  group.by = "sample_id"
+) + ggplot2::ggtitle("UMAP on PCA")
+```
+Yay! Save as PNG 
+```{r}
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/UMAP.png", width = 15*png_res, height = 8*png_res, res = png_res);print(UMAP);dev.off()
+```
+
+Testing if normalizing and scaling helps at all. It did!!! Same scale :D
+```{r}
+KRT5_plot <- MapFeatures(vis_mod_norm,
+            colors = RColorBrewer::brewer.pal(n = 9, name = "Reds"),
+            feature = "KRT5", 
+            image_use = "raw",
+            ncol = 4,
+            pt_alpha = 0.5,
+            scale_alpha = FALSE, 
+            max_cutoff = 0.95,
+            add_scalebar = T, scalebar_position = c(0.8,0.9),
+            pt_stroke = NA,
+            pt_size = 1,
+            slot = "counts")
+```
+
+Yay! Save as PNG 
+```{r}
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/KRT5_plot_on_scaled_data.png", width = 15*png_res, height = 8*png_res, res = png_res);print(KRT5_plot);dev.off()
+```
+
+ 
+
+```{r}
+#### Save object
+saveRDS(vis_mod_norm,
+        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/new_object/", "vis_mod_norm.rds"))
+```
+
