@@ -376,7 +376,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 ```
 
 ```{r fig.width=10, fig.height=8}
-vis_mod_stroma <- SubsetSTData(vis_mod_anno, expression = Stroma_Anno %in% c("adipose", "desmoplastic", "fibrous"))
+vis_mod_stroma <- SubsetSTData(deconv, expression = Stroma_Anno %in% c("adipose", "desmoplastic", "fibrous"))
 
 plot.df_stroma <- vis_mod_stroma@meta.data %>%
   mutate(

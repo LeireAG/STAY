@@ -71,6 +71,24 @@ p
 png_res <- 1200
 png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/vis_mod_NMF_feature_loading.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p);dev.off()
 
+p_10_11_21 <- PlotFeatureLoadings(deconv, 
+                    dims = c(11, 21, 10), 
+                    reduction = "nmf", 
+                    nfeatures = 10,
+                    mode = "dotplot", 
+                    fill = "black",
+                    pt_size = 3,
+                    ncols = 3) &
+     labs(x = "Gene name", y = "Gene contribution") &
+     theme_minimal() &
+     theme(panel.grid.major = element_blank(),
+           panel.grid.minor = element_blank(),
+           axis.line = element_line(colour = "black"))
+p_10_11_21
+
+png_res <- 1200
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/deconv_feature_loading_selected_NMF.png", width = 8*png_res, height = 5*png_res, res = png_res);print(p_10_11_21);dev.off()
+
 pdf(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/vis_mod_NMF_feature_loading", ".pdf"), width = 14, height = 15)
 print(p)
 dev.off()
@@ -152,7 +170,7 @@ Visualization of factors spatially
 ```{r plot_NMF, fig.width=14, fig.height=25}
 pdf_4335_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4335_hard_NMF.pdf"
 pdf(file = pdf_4335_hard, width = 20, height = 30)
-p1 <- MapFeatures(vis_mod_nmf, 
+p1 <- MapFeatures(deconv, 
             section_number = 1,
             features = paste0("NMF_", 1:k), 
             override_plot_dims = TRUE, 
@@ -172,7 +190,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 ```{r plot_NMF, fig.width=14, fig.height=25}
 pdf_4335_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4335_soft_NMF.pdf"
 pdf(file = pdf_4335_soft, width = 20, height = 30)
-p2 <- MapFeatures(vis_mod_nmf, 
+p2 <- MapFeatures(deconv, 
             section_number = 2,
             features = paste0("NMF_", 1:k), 
             override_plot_dims = TRUE, 
@@ -192,7 +210,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 ```{r plot_NMF, fig.width=14, fig.height=25}
 pdf_4393_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4393_soft_NMF.pdf"
 pdf(file = pdf_4393_soft, width = 20, height = 30)
-p3 <- MapFeatures(vis_mod_nmf, 
+p3 <- MapFeatures(deconv, 
             section_number = 3,
             features = paste0("NMF_", 1:k), 
             override_plot_dims = TRUE, 
@@ -213,7 +231,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 ```{r plot_NMF, fig.width=14, fig.height=25}
 pdf_4393_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4393_hard_NMF.pdf"
 pdf(file = pdf_4393_hard, width = 20, height = 30)
-p4 <- MapFeatures(vis_mod_nmf, 
+p4 <- MapFeatures(deconv, 
             section_number = 4,
             features = paste0("NMF_", 1:k), 
             override_plot_dims = TRUE, 
@@ -233,7 +251,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 ```{r plot_NMF, fig.width=14, fig.height=25}
 pdf_4419_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4419_soft_NMF.pdf"
 pdf(file = pdf_4419_soft, width = 20, height = 30)
-p5 <- MapFeatures(vis_mod_nmf, 
+p5 <- MapFeatures(deconv, 
             section_number = 5,
             features = paste0("NMF_", 1:k), 
             override_plot_dims = TRUE, 
@@ -253,7 +271,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 ```{r plot_NMF, fig.width=14, fig.height=25}
 pdf_4419_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4419_hard_NMF.pdf"
 pdf(file = pdf_4419_hard, width = 20, height = 30)
-p6 <- MapFeatures(vis_mod_nmf, 
+p6 <- MapFeatures(deconv, 
             section_number = 6,
             features = paste0("NMF_", 1:k), 
             override_plot_dims = TRUE, 
@@ -273,7 +291,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 ```{r plot_NMF, fig.width=14, fig.height=25}
 pdf_4515_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4515_soft_NMF.pdf"
 pdf(file = pdf_4515_soft, width = 20, height = 30)
-p7 <- MapFeatures(vis_mod_nmf, 
+p7 <- MapFeatures(deconv, 
             section_number = 7,
             features = paste0("NMF_", 1:k), 
             override_plot_dims = TRUE, 
@@ -293,7 +311,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 ```{r plot_NMF, fig.width=14, fig.height=25}
 pdf_4515_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4515_hard_NMF.pdf"
 pdf(file = pdf_4515_hard, width = 20, height = 30)
-p8 <- MapFeatures(vis_mod_nmf, 
+p8 <- MapFeatures(deconv, 
             section_number = 8,
             features = paste0("NMF_", 1:k), 
             override_plot_dims = TRUE, 
