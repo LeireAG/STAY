@@ -8,7 +8,7 @@ In-house FFPE breast cancer tissue sections.
 # Overview of directories 
 # code/
 Contains the scrips to generate the analysis and figures in this study. 
-* figs/ 
+* # figs/ 
 - renv
 - renv.lock
 - figure_4/
@@ -17,7 +17,7 @@ Contains the scrips to generate the analysis and figures in this study.
 - figure_3_on_reviewed_annotations_copy.Rmd
 - supplmentary_figs_4_to_12.Rmd
 
-* preprocessing/
+* # preprocessing/
 - 01_calculate_crop_coords.py
 - 02_make_semla_object.R
 - 03_loading_reviewed_path_annotation copy.Rmd
