@@ -13,7 +13,7 @@ Contains the scrips to generate the analysis and figures in this study. Data pat
 - 01_calculate_crop_coords.py - Crops H&E images to the 6.5x6.5 mm or 11x11 mm area and adjusts spot coordinates.  
 - 02_make_semla_object.R - The cropped images and adjusted spot coordinates are used to create a Semla object all_samples_cropped_img.rds.
 - 03_loading_reviewed_path_annotation copy.Rmd - Loads pathology annotations, generates spot annotation plots in Figure 1 C1-4, F1-4, violin plots in Figure 3 J, K and stats in Supplementary Data 1. 
-- 04_QC_normalization_scaling.Rmd - Steps of quality control, scaling and normalization of the data. 
+- 04_QC_normalization_scaling.Rmd - Steps of quality control, scaling and normalization of the data. Used in fig 3
 - qupath_to_loupe.py - Produces spot based pathology annotation in .csv format to be used in the 03_loading_reviewed_path_annotation copy.Rmd script
 
  # figs/ 
