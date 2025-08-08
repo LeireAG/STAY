@@ -156,6 +156,7 @@ additional_overview <- MapLabels(vis_mod, column_name = "Additional_Anno", ncol 
 
 ```
 
+Generating the spot annotation plots used in Supplementary figures 3 to 10
 
 ```{r}
 png_res <- 1200
@@ -182,7 +183,7 @@ saveRDS(vis_mod,
 vis_mod_anno <- readRDS(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
 ```
 
-Preparing spot annotation for Figure 1 
+Preparing spot annotation plots for Figure 1 C1-4 and F1-4
 ```{r}
 # Let's make the annotation plots for Figure 1 with the UPDATED annotations. For simplicity we will label desmoplastic stroma as NA and relabel as "epithelial" everything that is not fibrous or adipose stroma. 
 
