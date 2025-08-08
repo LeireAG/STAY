@@ -115,7 +115,7 @@ ggsave(
     )
 ```
 
-### plot celltypes over factors figure 4 e. 
+### plot celltypes over factors. 
 ```{r}
 DefaultAssay(merged) <- "garvan_minor_map"
 # Calculate Spearman correlation between NMF factors and cell types
@@ -138,8 +138,8 @@ dev.off()
 saveRDS(merged, "/home/m.abreumachado/local_analysis/simplex/annotated_cohort/leirethings_hardcover/vis_mod_nmf_decon.rds")
 ```
 
-### composite plot of some cell types represented in figure 4 c,d.
-```{r}
+### composite plot of some cell types represented.
+#```{r}
 
 DefaultAssay(merged) <- "garvan_major_map" # mod here accordingly 
 features <- c("T-cells", "B-cells", "CAFs")
@@ -161,17 +161,17 @@ pt_size_map <- list(
 )
 sample_plots <- list()
 
-for (pair in names(pt_size_map)) {
+#for (pair in names(pt_size_map)) {
     tokeep <- colnames(merged)[grepl(pair, merged$sample_id)]
     toplot <- SubsetSTData(merged, spots = tokeep)
     pt_size <- pt_size_map[[pair]]
     p <- MapMultipleFeatures(toplot, features = features, label_by = "sample_id", ncol = 2, pt_size = pt_size, pt_stroke = 0.1, colors = cols, scale = "free", max_cutoff = 0.99)
     sample_plots[[pair]] <- p
-}
+#}
 # Merge all sample plots into a single plot
 final_plot <- patchwork::wrap_plots(sample_plots, ncol = 1)
 ggsave("/data/m.abreumachado/simplex/composite_celltypes_merged.jpg", final_plot, height = 20, width = 15, dpi = 300, limitsize = FALSE)
-```
+#```
 
 ```{r}
 vis_mod_nmf_decon <- readRDS(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/new_object/", "vis_mod_nmf_decon.rds"))
