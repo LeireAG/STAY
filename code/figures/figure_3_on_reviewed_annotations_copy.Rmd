@@ -74,8 +74,23 @@ QC_all_samples <- VlnPlot(vis_mod_norm, group.by = "sample_id", split.by = "meth
 ```
 
 Violin plots per layer 
-We chose the epithelial to compare the sensitivity between methods as usually epithelial areas remained intact in both standard and STAY methods. The comparison has its limitations (e.g. path annotation is not exactly the same in adjacent sections, the selected area in Patient 4 with the STAY is slightly sifthed compared to the standard method) 
+We chose the epithelial to compare the sensitivity between methods as usually epithelial areas remained intact in both standard and STAY methods. The comparison has its limitations (e.g. path annotation is not exactly the same in adjacent sections, the selected area in Patient 4 with the STAY is slightly shifted compared to the standard method) 
 
+```{r}
+# Load data (new Seurat object modified by Sophie) with my added annotations
+vis_mod <- readRDS(file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/new_object/corrected_object/", "vis_mod_nmf_decon.rds"))
+```
+
+```{r}
+#library(dplyr)
+
+# Example: Get total UMI count per section
+vis_mod@meta.data %>%
+  group_by(sample_id) %>%
+  summarize(median_UMI = median(nCount_Spatial),
+            mean_UMI = mean(nCount_Spatial))
+
+```
 
 ```{r}
 # Subset based on the annotation using an expession
@@ -95,13 +110,16 @@ plot.df1 <- vis_mod_epithelial@meta.data %>%
 ```
 
 ```{r} 
-#Generates figure 3K. 
-p <- ggplot(vis_mod_epithelial@meta.data, aes(y = nCount_Spatial, x = sample_id, fill = method)) +
+#Generates figure 3J. 
+p <- ggplot(plot.df1, aes(y = nCount_Spatial, x = sample_id, fill = method)) +
   geom_violin(trim = FALSE, scale = "width") +
   scale_y_log10() +
-  labs(title = "Log-transformed UMI Count Distribution in Epithelial Layer",
+  # Color settings
+  scale_fill_manual(values = c("STAY" = "#FBB4AE",  # pastel red
+                             "standard" = "#B3CDE3")) + # pastel blue
+  labs(title = "UMI Count Distribution in Epithelial Layer",
        x = "Sample ID",
-       y = "Log-transformed UMI Count") +
+       y = "UMI Count (log scale)") +
   geom_boxplot(width = 0.1, outlier.shape = NA) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -190,7 +208,7 @@ vis_mod_norm@meta.data %>%
   theme_minimal()
 ```
 
-Can I have a look in all samples? This generates figure 3) J. 
+Can I have a look in all samples? This generates figure 1 G1-G4. 
 ```{r width = 10, height = 8}
 #vis_mod_norm@meta.data %>%
 spots_by_method <- vis_mod_anno@meta.data %>%  
@@ -229,12 +247,12 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 ```
 
 Yay! Save as PNG 
-```{r}
+#```{r}
 png_res <- 1200
 png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/Data_loss_across_method.png", width = 15*png_res, height = 8*png_res, res = png_res);print(QC_all_samples);dev.off()
-```
+#```
 
-Violin plot of unique genes
+Violin plot of unique genes generates figure 3I
 ```{r, fig.width = 10, fig.height = 8}
 unique_genesVplot <- VlnPlot(
   vis_mod_anno,
@@ -265,7 +283,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 ```
 
 Violin plot of unique genes
-```{r, fig.width = 10, fig.height = 8}
+#```{r, fig.width = 10, fig.height = 8}
 DefaultAssay(deconv) <- "Spatial"
 unique_genesVplot <- VlnPlot(
   deconv,
@@ -300,4 +318,4 @@ total_umi_stats <- deconv@meta.data %>%
   )
 
 
-```
+#```
