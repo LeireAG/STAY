@@ -327,7 +327,7 @@ plot.df1 <- vis_mod_epithelial@meta.data %>%
 ```
 
 ```{r fig.width=10, fig.height=8}
-p_epithelial <- ggplot(plot.df1, aes(y = log_nCount, x = patient, fill = method)) +
+p_epithelial <- ggplot(plot.df1, aes(y = nCount_Spatial, x = patient, fill = method)) +
   geom_violin(trim = FALSE, scale = "width", width = 1) +
   #geom_jitter(shape = 21, color = "grey40", size = 1, alpha = 1, position = position_dodge(width = 1)) +
   #stat_summary(fun = mean, geom = "point", shape = 23, size = 2, fill = "white", position = position_dodge(width = 1)) +
@@ -362,7 +362,7 @@ plot.df_immune <- vis_mod_immune@meta.data %>%
   )
 
 # Plot
-p_immune <- ggplot(plot.df_immune, aes(y = log_nCount, x = patient, fill = method)) +
+p_immune <- ggplot(plot.df_immune, aes(y = nCount_Spatial, x = patient, fill = method)) +
   geom_violin(trim = FALSE, scale = "width", width = 1) +
   geom_boxplot(width = 0.2, outlier.shape = NA, position = position_dodge(width = 1)) +
   labs(title = "Log-transformed UMI Count Distribution in Immune Layer",
@@ -375,12 +375,15 @@ png_res <- 1200
 png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/immune_comparison.png", width = 15*png_res, height = 8*png_res, res = png_res);print(p_immune);dev.off()
 ```
 
+#testing scales for stroma layer
+
 ```{r fig.width=10, fig.height=8}
-vis_mod_stroma <- SubsetSTData(deconv, expression = Stroma_Anno %in% c("adipose", "desmoplastic", "fibrous"))
+vis_mod_stroma <- SubsetSTData(vis_mod_anno, expression = Stroma_Anno %in% c("adipose", "desmoplastic", "fibrous"))
 
 plot.df_stroma <- vis_mod_stroma@meta.data %>%
   mutate(
-    log_nCount = log1p(nCount_Spatial),
+    log_nCount = log10(nCount_Spatial + 1),
+    #log1p(nCount_Spatial), natural log
     Stroma_Anno = as.factor(Stroma_Anno),
     method = as.factor(method),
     patient = as.factor(patient)
@@ -390,7 +393,7 @@ p_stroma <- ggplot(plot.df_stroma, aes(y = log_nCount, x = patient, fill = metho
   geom_violin(trim = FALSE, scale = "width", width = 1) +
   geom_boxplot(width = 0.1, outlier.shape = NA, position = position_dodge(width = 1)) +
   labs(title = "Log-transformed UMI Count Distribution in Stroma Layer",
-       x = "Patient", y = "Log-transformed UMI Count") +
+       x = "Patient", y = "log10(UMI count + 1)") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_fill_manual(values = c("STAY" = "#FBB4AE",  # pastel red
@@ -399,7 +402,7 @@ p_stroma <- ggplot(plot.df_stroma, aes(y = log_nCount, x = patient, fill = metho
 print(p_stroma)
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/stroma_comparison.png", width = 10*png_res, height = 8*png_res, res = png_res);print(p_stroma);dev.off()
+png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/stroma_comparisonlog10.png", width = 10*png_res, height = 8*png_res, res = png_res);print(p_stroma);dev.off()
 ```
 
 ```{r}
