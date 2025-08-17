@@ -90,6 +90,10 @@ p_10_11_21
 png_res <- 1200
 png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/deconv_feature_loading_selected_NMF.png", width = 8*png_res, height = 5*png_res, res = png_res);print(p_10_11_21);dev.off()
 
+pdf(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/deconv_feature_loading_selected_NMF", ".pdf"), width = 10, height = 5)
+print(p_10_11_21)
+dev.off()
+
 pdf(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/vis_mod_NMF_feature_loading", ".pdf"), width = 14, height = 15)
 print(p)
 dev.off()
@@ -120,12 +124,40 @@ Supplementary figure 11 <- # Visualize gene contributions (heatmap)
 p1 <- PlotFeatureLoadings(vis_mod_nmf, 
                     dims = 1:k, 
                     reduction = "nmf", 
-                    nfeatures = 15, 
+                    nfeatures = 10, 
                     mode = "heatmap", 
                     gradient_colors = viridis::magma(n = 11, direction = -1))
+
 print(p1)
 png_res <- 1200
 png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/gene_loadings_heatmap.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+
+ggsave(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/gene_loadings_heatmap", ".pdf"), plot = p1, width = 14, height = 25, dpi = 300)
+
+pdf(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/gene_loadings_heatmap", ".pdf"), width = 14, height = 25)
+print(p1)
+dev.off()
+
+p2 <- PlotFeatureLoadings(vis_mod_nmf, 
+                    dims = 1:12, 
+                    reduction = "nmf", 
+                    nfeatures = 10, 
+                    mode = "heatmap", 
+                    gradient_colors = viridis::magma(n = 11, direction = -1))
+p2
+
+ggsave(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/gene_loadings_heatmap_NMF1_12", ".pdf"), plot = p2, width = 6.5, height = 11.6, dpi = 300)
+
+p3 <- PlotFeatureLoadings(vis_mod_nmf, 
+                    dims = 13:24, 
+                    reduction = "nmf", 
+                    nfeatures = 10, 
+                    mode = "heatmap", 
+                    gradient_colors = viridis::magma(n = 11, direction = -1))
+p3
+
+ggsave(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/gene_loadings_heatmap_NMF13_24", ".pdf"), plot = p3, width = 6.5, height = 11.6, dpi = 300)
+
 ```
 ## Run functional enrichment analysis on top 10 genes from all factors 
 
