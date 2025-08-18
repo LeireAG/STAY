@@ -22,9 +22,7 @@ Contains the scripts to generate the analysis and figures in this study. Data pa
 - figure_4/ - generates a normalized with corrected number of spots Seurat object including nmf and deconvolution vis_mod_nmf_decon.rds
 * figure_4_copy.Rmd contains the code to run Non-Negative_matrix Factorization and saving that Seurat object. Generates fig. 4 A, ploting factors spatially and suppl. fig. 11. 
 * semla_deconvolution.rmd contains the code to run the NNLS deconvolution method included in the Semla package on the previous object containing NMF factors
-- figure_1.Rmd - testing and intermediate steps
-- figure_3.Rmd - testing and intermediate steps
-- figure_3_on_reviewed_annotations_copy.Rmd generates spatial plots of normalized unique genes per spot (figure 3 A-H), spot number barplots in Figure 1 G1-4, violin plots in Figure 3 I and stats in Supplementary Data 1 after normalization. 
+- figure_3_on_reviewed_annotations_copy.Rmd generates spatial plots of normalized unique genes per spot (figure 3 A-H), spot number barplots in Figure 1 G1-4 and violin plots in Figure 3 I. 
 - supplmentary_figs_4_to_12.Rmd - testing and intermediate steps
 
 # Data availability
