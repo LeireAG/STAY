@@ -1,9 +1,8 @@
 ---
 title: "figure_4"
 Aim: investigating areas of detachment by Non-Negative Matrix factorization and deconvolution with the NNLS method
-Figure 4 has changed to reflect the cancer biology in the paper 
+in Figure 4 to reflect the cancer biology in the paper 
 I am displaying deconvolution results and NMF
-I am saving high res images as a PNG in Figure_5/deconv/
 ---
 
 ```{r}
@@ -32,13 +31,13 @@ vis_mod_nmf <- RunNMF(vis_mod_norm, assay = "RNA3") #k = 20 (if I want exactly 2
 ```{r}
 #### Save object
 saveRDS(vis_mod_nmf,
-        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_nmf.rds"))
+        file = paste0("my_path/", "vis_mod_nmf.rds"))
 ```
 
 2. Run deconvolution on this object using the semla deconvolution script save and load. 
 
 ```{r, eval = FALSE}
-vis_mod_nmf <- readRDS(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/new_object/corrected_object/", "vis_mod_nmf_decon.rds"))
+vis_mod_nmf <- readRDS(paste0("my_path/", "vis_mod_nmf_decon.rds"))
 ```
 
 ```{r}
@@ -88,55 +87,19 @@ p_10_11_21 <- PlotFeatureLoadings(deconv,
 p_10_11_21
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/deconv_feature_loading_selected_NMF.png", width = 8*png_res, height = 5*png_res, res = png_res);print(p_10_11_21);dev.off()
+png(filename = "/my_path/deconv_feature_loading_selected_NMF.png", width = 8*png_res, height = 5*png_res, res = png_res);print(p_10_11_21);dev.off()
 
-pdf(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/deconv_feature_loading_selected_NMF", ".pdf"), width = 10, height = 5)
+pdf(paste0("/my_path/", "/deconv_feature_loading_selected_NMF", ".pdf"), width = 10, height = 5)
 print(p_10_11_21)
 dev.off()
 
-pdf(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/vis_mod_NMF_feature_loading", ".pdf"), width = 14, height = 15)
+pdf(paste0("/my_path/", "/vis_mod_NMF_feature_loading", ".pdf"), width = 14, height = 15)
 print(p)
 dev.off()
 ```
 
-Functional Enrichment Analysis to indentify the gene ontology of the gene programmes in each factor
-```{r}
-#Extract feature loadings from DimReduc object for each factor to run Func Enrich Analysis
-nmf_loadings <- vis_mod_nmf[["nmf"]]@feature.loadings
-
-# Convert to long format and group data by factor
-gene_loadings_sorted <- nmf_loadings |> 
-  as.data.frame() |> 
-  tibble::rownames_to_column(var = "gene") |> 
-  as_tibble() |> 
-  tidyr::pivot_longer(all_of(colnames(nmf_loadings)), names_to = "fctr", values_to = "loading") |> 
-  mutate(fctr = factor(fctr, colnames(nmf_loadings))) |> 
-  group_by(fctr) |> 
-  arrange(fctr, -loading)
-
-# Extract top 10 genes per factor
-gene_loadings_sorted |> 
-  slice_head(n = 10)
-```
-
-Supplementary figure 11 <- # Visualize gene contributions (heatmap)
+Supplementary figure 11 and 12 <- # Visualize gene contributions (in heatmap divided in two)
 ```{r fig.width=14, fig.height=25}
-p1 <- PlotFeatureLoadings(vis_mod_nmf, 
-                    dims = 1:k, 
-                    reduction = "nmf", 
-                    nfeatures = 10, 
-                    mode = "heatmap", 
-                    gradient_colors = viridis::magma(n = 11, direction = -1))
-
-print(p1)
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/gene_loadings_heatmap.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
-
-ggsave(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/gene_loadings_heatmap", ".pdf"), plot = p1, width = 14, height = 25, dpi = 300)
-
-pdf(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/gene_loadings_heatmap", ".pdf"), width = 14, height = 25)
-print(p1)
-dev.off()
 
 p2 <- PlotFeatureLoadings(vis_mod_nmf, 
                     dims = 1:12, 
@@ -146,7 +109,7 @@ p2 <- PlotFeatureLoadings(vis_mod_nmf,
                     gradient_colors = viridis::magma(n = 11, direction = -1))
 p2
 
-ggsave(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/gene_loadings_heatmap_NMF1_12", ".pdf"), plot = p2, width = 6.5, height = 11.6, dpi = 300)
+ggsave(paste0("/my_path/", "/gene_loadings_heatmap_NMF1_12", ".pdf"), plot = p2, width = 6.5, height = 11.6, dpi = 300)
 
 p3 <- PlotFeatureLoadings(vis_mod_nmf, 
                     dims = 13:24, 
@@ -156,53 +119,15 @@ p3 <- PlotFeatureLoadings(vis_mod_nmf,
                     gradient_colors = viridis::magma(n = 11, direction = -1))
 p3
 
-ggsave(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/", "/gene_loadings_heatmap_NMF13_24", ".pdf"), plot = p3, width = 6.5, height = 11.6, dpi = 300)
-
-```
-## Run functional enrichment analysis on top 10 genes from all factors 
-
-```{r}
-library(gprofiler2)
-
-
-# Loop through all 24 NMF factors
-for (i in 1:24) {
-  factor_name <- paste0("NMF_", i)
-  cat("\n==========", factor_name, "==========\n")
-  
-  # Get top 10 genes for the current factor
-  gene_set <- gene_loadings_sorted |> 
-    filter(fctr == factor_name) |> 
-    slice_head(n = 10)
-  
-  # Run GO enrichment and show only top term
-  result <- tryCatch({
-    fea <- gost(query = gene_set$gene,
-                ordered_query = TRUE,
-                organism = "hsapiens",
-                sources = "GO:BP")
-    
-    if (!is.null(fea$result) && nrow(fea$result) > 0) {
-      top_term <- fea$result[1, ]
-      cat("Top GO term:\n")
-      cat("- Name: ", top_term$term_name, "\n")
-      cat("- p-value: ", signif(top_term$p_value, 3), "\n")
-      cat("- Intersection size: ", top_term$intersection_size, "/", top_term$query_size, "\n")
-    } else {
-      cat("No GO term enrichment found.\n")
-    }
-  }, error = function(e) {
-    cat("Error:", e$message, "\n")
-  })
-}
+ggsave(paste0("/my_path/", "/gene_loadings_heatmap_NMF13_24", ".pdf"), plot = p3, width = 6.5, height = 11.6, dpi = 300)
 
 ```
 
-Visualization of factors spatially 
+Visualization of factors spatially for Supplementary figures 3 to 10
 
 ```{r plot_NMF, fig.width=14, fig.height=25}
-pdf_4335_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4335_hard_NMF.pdf"
-pdf(file = pdf_4335_hard, width = 20, height = 30)
+pdf_clinical_id_1_STAY <- "/my_path/pdf_clinical_id_1_STAY.pdf"
+pdf(file = pdf_clinical_id_1_STAY, width = 20, height = 30)
 p1 <- MapFeatures(deconv, 
             section_number = 1,
             features = paste0("NMF_", 1:k), 
@@ -217,12 +142,11 @@ print(p1)
 dev.off()
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4335_hard_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
+png(filename = "/my_path/clinical_id_1_STAY.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p1);dev.off()
 ```
 
 ```{r plot_NMF, fig.width=14, fig.height=25}
-pdf_4335_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4335_soft_NMF.pdf"
-pdf(file = pdf_4335_soft, width = 20, height = 30)
+
 p2 <- MapFeatures(deconv, 
             section_number = 2,
             features = paste0("NMF_", 1:k), 
@@ -234,15 +158,11 @@ p2 <- MapFeatures(deconv,
   theme(plot.title = element_blank())
 
 print(p2)
-dev.off()
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4335_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p2);dev.off()
 ```
 
 ```{r plot_NMF, fig.width=14, fig.height=25}
-pdf_4393_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4393_soft_NMF.pdf"
-pdf(file = pdf_4393_soft, width = 20, height = 30)
+
 p3 <- MapFeatures(deconv, 
             section_number = 3,
             features = paste0("NMF_", 1:k), 
@@ -254,16 +174,12 @@ p3 <- MapFeatures(deconv,
   theme(plot.title = element_blank())
 
 print(p3)
-dev.off()
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4393_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p3);dev.off()
 ```
 
 
 ```{r plot_NMF, fig.width=14, fig.height=25}
-pdf_4393_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4393_hard_NMF.pdf"
-pdf(file = pdf_4393_hard, width = 20, height = 30)
+
 p4 <- MapFeatures(deconv, 
             section_number = 4,
             features = paste0("NMF_", 1:k), 
@@ -275,15 +191,11 @@ p4 <- MapFeatures(deconv,
   theme(plot.title = element_blank())
 
 print(p4)
-dev.off()
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4393_hard_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p4);dev.off()
 ```
 
 ```{r plot_NMF, fig.width=14, fig.height=25}
-pdf_4419_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4419_soft_NMF.pdf"
-pdf(file = pdf_4419_soft, width = 20, height = 30)
+
 p5 <- MapFeatures(deconv, 
             section_number = 5,
             features = paste0("NMF_", 1:k), 
@@ -295,15 +207,11 @@ p5 <- MapFeatures(deconv,
   theme(plot.title = element_blank())
 
 print(p5)
-dev.off()
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4419_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p5);dev.off()
 ```
 
 ```{r plot_NMF, fig.width=14, fig.height=25}
-pdf_4419_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4419_hard_NMF.pdf"
-pdf(file = pdf_4419_hard, width = 20, height = 30)
+
 p6 <- MapFeatures(deconv, 
             section_number = 6,
             features = paste0("NMF_", 1:k), 
@@ -315,15 +223,11 @@ p6 <- MapFeatures(deconv,
   theme(plot.title = element_blank())
 
 print(p6)
-dev.off()
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4419_hard_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p6);dev.off()
 ```
 
 ```{r plot_NMF, fig.width=14, fig.height=25}
-pdf_4515_soft <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4515_soft_NMF.pdf"
-pdf(file = pdf_4515_soft, width = 20, height = 30)
+
 p7 <- MapFeatures(deconv, 
             section_number = 7,
             features = paste0("NMF_", 1:k), 
@@ -335,15 +239,11 @@ p7 <- MapFeatures(deconv,
   theme(plot.title = element_blank())
 
 print(p7)
-dev.off()
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4515_soft_NMF.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p7);dev.off()
 ```
 
 ```{r plot_NMF, fig.width=14, fig.height=25}
-pdf_4515_hard <- "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/4515_hard_NMF.pdf"
-pdf(file = pdf_4515_hard, width = 20, height = 30)
+
 p8 <- MapFeatures(deconv, 
             section_number = 8,
             features = paste0("NMF_", 1:k), 
@@ -355,17 +255,9 @@ p8 <- MapFeatures(deconv,
   theme(plot.title = element_blank())
 
 print(p8)
-dev.off()
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Supplementary/factors/4515_hard_NMF_w14_h25.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p8);dev.off()
 ```
 
-Plot deconv results and nmf with the correct scales 0 to 1 and 0 to max. Select the factors that match biology. 
-
-```{r}
-deconv <- readRDS(file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/new_object/corrected_object/", "vis_mod_nmf_decon.rds"))
-```
 
 ### plot celltypes over factors figure 4 A. 
 ```{r}
