@@ -272,7 +272,9 @@ nmf_matrix <- nmf_matrix[shared_rownames, , drop = FALSE]
 celltype_matrix <- celltype_matrix[shared_rownames, , drop = FALSE]
 correlation_matrix <- cor(nmf_matrix, celltype_matrix, method = "spearman")
 
-pdf("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/nmf_major_celltype_correlation.pdf", width = 10, height = 10)
+library(heatmap3)
+
+pdf("/my_path/nmf_major_celltype_correlation.pdf", width = 10, height = 10)
     heatmap3(correlation_matrix, 
     margins = c(12, 10))
 dev.off()
@@ -288,7 +290,7 @@ selected_celltypes <- c("B-cells")
 # Step 2: Plot with consistent visible color scale
 pastel_turbo <- adjustcolor(viridis::turbo(11), alpha.f = 1, red.f = 1.2, green.f = 1.2, blue.f = 1.2)
 
-p_Bcells_4515_hard <- lapply(seq_along(selected_celltypes), function(i) {
+p_Bcells_patient4_STAY <- lapply(seq_along(selected_celltypes), function(i) {
   MapFeatures(deconv, pt_size = 1.3,
             features = selected_celltypes[i], 
             colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
@@ -307,18 +309,12 @@ p_Bcells_4515_hard <- lapply(seq_along(selected_celltypes), function(i) {
           legend.text = element_text(angle = 0))
 }) |> setNames(nm = selected_celltypes)
 
-print(p_Bcells_4515_hard)
-
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Bcells_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_Bcells_4515_hard);dev.off()
 ```
 
 ```{r width = 8, height = 6}
-# Step 1: Get the global max of all factor values
-max_nmf_value <- max(deconv@reductions$nmf@cell.embeddings)
 
-#trying to map NMF
-p_NMF11_4515_hard <- MapFeatures(deconv, 
+# Map NMF
+p_NMF11_patient4_STAY <- MapFeatures(deconv, 
             features = paste0("NMF_", 11),
             section_number = 8,
             override_plot_dims = TRUE, 
@@ -338,10 +334,6 @@ p_NMF11_4515_hard <- MapFeatures(deconv,
     legend.text = element_text(angle = 0)
   )
 
-print(p_NMF11_4515_hard)
-
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_11_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF11_4515_hard);dev.off()
 ```
 
 ```{r width = 8, height = 6}
@@ -349,7 +341,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 
 DefaultAssay(deconv) <- "garvan_major_map"
 selected_celltypes <- c("Plasmablasts")
-p_plasma_4515_hard <- lapply(seq_along(selected_celltypes), function(i) {
+p_plasma_Patient4_STAY <- lapply(seq_along(selected_celltypes), function(i) {
   MapFeatures(deconv, pt_size = 1.3,
             features = selected_celltypes[i], 
             colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
@@ -367,15 +359,12 @@ p_plasma_4515_hard <- lapply(seq_along(selected_celltypes), function(i) {
           legend.position = "right",
           legend.text = element_text(angle = 0))
 }) |> setNames(nm = selected_celltypes)
-print(p_plasma_4515_hard)
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Plasmablasts_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_plasma_4515_hard);dev.off()
 ```
 
 ```{r width = 8, height = 6}
 #trying to map NMF
-p_NMF21_4515_hard <- MapFeatures(deconv, 
+p_NMF21_Patient4_STAY <- MapFeatures(deconv, 
             features = paste0("NMF_", 21),
             section_number = 8,
             override_plot_dims = TRUE, 
@@ -394,10 +383,7 @@ p_NMF21_4515_hard <- MapFeatures(deconv,
     legend.position = "right",
     legend.text = element_text(angle = 0)
   )
-print(p_NMF21_4515_hard)
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_21_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF21_4515_hard);dev.off()
 ```
 
 ```{r width = 8, height = 6}
@@ -405,7 +391,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 
 DefaultAssay(deconv) <- "garvan_major_map"
 selected_celltypes <- c("Myeloid")
-p_myeloid_4515_hard <- lapply(seq_along(selected_celltypes), function(i) {
+p_myeloid_Patient4_STAY <- lapply(seq_along(selected_celltypes), function(i) {
   MapFeatures(deconv, pt_size = 1.3,
             features = selected_celltypes[i], 
             colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
@@ -423,15 +409,12 @@ p_myeloid_4515_hard <- lapply(seq_along(selected_celltypes), function(i) {
           legend.position = "right",
           legend.text = element_text(angle = 0))
 }) |> setNames(nm = selected_celltypes)
-print(p_myeloid_4515_hard)
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Myeloid_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_myeloid_4515_hard);dev.off()
 ```
 
 ```{r width = 8, height = 6}
 #trying to map NMF
-p_NMF10_4515_hard <- MapFeatures(deconv, 
+p_NMF10_Patient4_STAY <- MapFeatures(deconv, 
             features = paste0("NMF_", 10),
             section_number = 8,
             override_plot_dims = TRUE, 
@@ -450,10 +433,7 @@ p_NMF10_4515_hard <- MapFeatures(deconv,
     legend.position = "right",
     legend.text = element_text(angle = 0)
   )
-print(p_NMF10_4515_hard)
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_10_4515_hard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF10_4515_hard);dev.off()
 ```
 
 Starting plotting patient 4 - standard
@@ -461,7 +441,7 @@ Starting plotting patient 4 - standard
 ```{r}
 #test for scale 0 to 1
 selected_celltypes <- c("B-cells")
-p_Bcells_4515_soft <- lapply(seq_along(selected_celltypes), function(i) {
+p_Bcells_Patient4_stanadard <- lapply(seq_along(selected_celltypes), function(i) {
   MapFeatures(deconv, pt_size = 1.3,
               features = selected_celltypes[i], 
               section_number = 7,
@@ -477,17 +457,12 @@ p_Bcells_4515_soft <- lapply(seq_along(selected_celltypes), function(i) {
           legend.text = element_text(angle = 0))
 }) |> setNames(nm = selected_celltypes)
 
-print(p_Bcells_4515_soft)
-
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Bcells_4515_soft.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_Bcells_4515_soft);dev.off()
-
 ```
 
 ```{r}
 #test for scale 0 to 1
 selected_celltypes <- c("Plasmablasts")
-p_Plasmablast_4515_soft <- lapply(seq_along(selected_celltypes), function(i) {
+p_Plasmablast_Patient4_standard <- lapply(seq_along(selected_celltypes), function(i) {
   MapFeatures(deconv, pt_size = 1.3,
               features = selected_celltypes[i], 
               section_number = 7,
@@ -504,57 +479,15 @@ p_Plasmablast_4515_soft <- lapply(seq_along(selected_celltypes), function(i) {
           legend.text = element_text(angle = 0))
 }) |> setNames(nm = selected_celltypes)
 
-print(p_Plasmablast_4515_soft)
-
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Plasmablast_4515_soft.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_Plasmablast_4515_soft);dev.off()
-
 ```
 
-```{r}
-library(ggplot2)
-
-# Step 1: Get the global max of all factor values
-max_nmf_value <- max(deconv@reductions$nmf@cell.embeddings)
-
-# Step 2: Plot with consistent color scale
-pastel_turbo <- adjustcolor(viridis::turbo(100), alpha.f = 1, red.f = 1.2, green.f = 1.2, blue.f = 1.2)
-
-
-test_factor_soft<- MapFeatures(
-  deconv, 
-  features = "NMF_21",
-  section_number = 8,
-  override_plot_dims = TRUE, 
-  pt_size = 1.3, 
-  max_cutoff = 0.99,
-  #colors = viridis::magma(n = 11, direction = -1)
-) & 
-   scale_fill_gradientn(
-  colours = viridis::magma(n = 11, direction = -1),
-  #limits = c(0, max_nmf_value),
-  name = "Factor\nactivity"
-  ) & 
-  theme(
-    plot.title = element_blank(), 
-    legend.position = "right",
-    legend.text = element_text(angle = 0)
-  )
-
-# Optional: save to file
-print(test_factor_soft)
-
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/test_factor21.png", width = 8*png_res, height = 6*png_res, res = png_res);print(test_factor);dev.off()
-
-
-```
 
 ```{r width = 8, height = 6}
 # Plot selected cell types
 
 DefaultAssay(deconv) <- "garvan_major_map"
 selected_celltypes <- c("B-cells")
-p_Bcells_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
+p_Bcells_Patient4_standard <- lapply(seq_along(selected_celltypes), function(i) {
   MapFeatures(deconv, pt_size = 1.3,
             features = selected_celltypes[i], 
             colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
@@ -565,15 +498,12 @@ p_Bcells_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
   theme(plot.title = element_blank(), 
         legend.position = "right", legend.text = element_text(angle = 0))
 }) |> setNames(nm = selected_celltypes)
-print(p_Bcells_4515_standard)
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/deconv/p_Bcells_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_Bcells_4515_standard);dev.off()
 ```
 
 ```{r width = 8, height = 6}
 #trying to map NMF
-p_NMF11_4515_standard <- MapFeatures(deconv, 
+p_NMF11_Patient4_standard <- MapFeatures(deconv, 
             features = paste0("NMF_", 11),
             section_number = 7,
             override_plot_dims = TRUE, 
@@ -584,10 +514,7 @@ p_NMF11_4515_standard <- MapFeatures(deconv,
             colors = viridis::magma(n = 11, direction = -1)) &
   theme(plot.title = element_blank(), 
         legend.position = "right", legend.text = element_text(angle = 0))
-print(p_NMF11_4515_standard)
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_11_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF11_4515_standard);dev.off()
 ```
 
 ```{r width = 8, height = 6}
@@ -595,7 +522,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 
 DefaultAssay(deconv) <- "garvan_major_map"
 selected_celltypes <- c("Plasmablasts")
-p_plasma_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
+p_plasma_Patient4_standard <- lapply(seq_along(selected_celltypes), function(i) {
   MapFeatures(deconv, pt_size = 1.3,
             features = selected_celltypes[i], 
             colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
@@ -608,13 +535,11 @@ p_plasma_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
 }) |> setNames(nm = selected_celltypes)
 print(p_plasma_4515_standard)
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/deconv/p_Plasmablasts_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_plasma_4515_standard);dev.off()
 ```
 
 ```{r width = 8, height = 6}
 #trying to map NMF
-p_NMF21_4515_standard <- MapFeatures(deconv, 
+p_NMF21_Patient4_standard <- MapFeatures(deconv, 
             features = paste0("NMF_", 21),
             section_number = 7,
             override_plot_dims = TRUE, 
@@ -625,10 +550,7 @@ p_NMF21_4515_standard <- MapFeatures(deconv,
             colors = viridis::magma(n = 11, direction = -1)) &
   theme(plot.title = element_blank(), 
         legend.position = "right", legend.text = element_text(angle = 0))
-print(p_NMF21_4515_standard)
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_21_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF21_4515_standard);dev.off()
 ```
 
 ```{r width = 8, height = 6}
@@ -636,7 +558,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 
 DefaultAssay(deconv) <- "garvan_major_map"
 selected_celltypes <- c("Myeloid")
-p_myeloid_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
+p_myeloid_Patient4_standard <- lapply(seq_along(selected_celltypes), function(i) {
   MapFeatures(deconv, pt_size = 1.3,
             features = selected_celltypes[i], 
             colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
@@ -654,16 +576,13 @@ p_myeloid_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
           legend.text = element_text(angle = 0))
 }) |> setNames(nm = selected_celltypes)
 
-print(p_myeloid_4515_standard)
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Myeloid_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_myeloid_4515_standard);dev.off()
 ```
 
 
 ```{r width = 8, height = 6}
 #trying to map NMF
-p_NMF10_4515_standard <- MapFeatures(deconv, 
+p_NMF10_Patient4_standard <- MapFeatures(deconv, 
             features = paste0("NMF_", 10),
             section_number = 7,
             override_plot_dims = TRUE, 
@@ -674,10 +593,7 @@ p_NMF10_4515_standard <- MapFeatures(deconv,
             colors = viridis::magma(n = 11, direction = -1)) &
   theme(plot.title = element_blank(), 
         legend.position = "right", legend.text = element_text(angle = 0))
-print(p_NMF10_4515_standard)
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/pNMF_10_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_NMF10_4515_standard);dev.off()
 ```
 
 ```{r width = 8, height = 6}
@@ -685,7 +601,7 @@ png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_B
 
 DefaultAssay(deconv) <- "garvan_major_map"
 selected_celltypes <- c("T-cells")
-p_Tcells_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
+p_Tcells_Patient4_standard <- lapply(seq_along(selected_celltypes), function(i) {
   MapFeatures(deconv, pt_size = 1.3,
             features = selected_celltypes[i], 
             colors = RColorBrewer::brewer.pal(n = 9, name = "Spectral") |> rev(),
@@ -703,9 +619,6 @@ p_Tcells_4515_standard <- lapply(seq_along(selected_celltypes), function(i) {
           legend.text = element_text(angle = 0))
 }) |> setNames(nm = selected_celltypes)
 
-print(p_Tcells_4515_standard)
 
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/deconv/p_Myeloid_4515_standard.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_myeloid_4515_standard);dev.off()
 ```
 

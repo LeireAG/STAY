@@ -20,10 +20,9 @@ Contains the scripts to generate the analysis and figures in this study. Data pa
 - renv - Copy of Rstudio local environment where we performed the analysis. Contains the versions of R packages. 
 - renv.lock - Lists exact package versions in the project-specific environment 
 - figure_4/ - generates a normalized with corrected number of spots Seurat object including nmf and deconvolution vis_mod_nmf_decon.rds
-* figure_4_copy.Rmd contains the code to run Non-Negative_matrix Factorization and saving that Seurat object. Generates fig. 4 A, ploting factors spatially and suppl. fig. 11. 
+* figure_4_copy.Rmd contains the code to run Non-Negative_matrix Factorization and saving that Seurat object. Generates fig. 4 A, B, D1-I1 and D2-I2. Used for ploting factors spatially for supplementary figs 3-12. 
 * semla_deconvolution.rmd contains the code to run the NNLS deconvolution method included in the Semla package on the previous object containing NMF factors
 - figure_3_on_reviewed_annotations_copy.Rmd generates spatial plots of normalized unique genes per spot (figure 3 A-H), spot number barplots in Figure 1 G1-4 and violin plots in Figure 3 I. 
-- supplmentary_figs_4_to_12.Rmd - testing and intermediate steps
 
 # Data availability
 Full resolution hematoxylin-eosin images and Seurat objects will be uploaded to the KTH Data Repository insert DOI. 
