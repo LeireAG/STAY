@@ -135,6 +135,6 @@ unique_genesVplot <- unique_genesVplot + geom_boxplot(
 )
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/unique_genes_by_method.png", width = 10*png_res, height = 8*png_res, res = png_res);print(unique_genesVplot);dev.off()
+png(filename = "/my_path/unique_genes_by_method.png", width = 10*png_res, height = 8*png_res, res = png_res);print(unique_genesVplot);dev.off()
 
 ```
