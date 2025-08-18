@@ -1,7 +1,5 @@
 # Aim: Now I am adding the reworked_annotations_alternative to the vis_mod object. 
-At least here I won't have mixed annotations in the same layer but between layers. I am gonna process each annotation layer separately. This way I can isolate the specific annotation in a layer and correspoding spots (eg. epithelial invasive) to do pairwise comparisons. 
 
-Note Sandra reviewed the annotations in Aug Sept 2024 and I am loading those in this script "reviewed_path_annotation"
 
 ```{r}
 # Load packages
@@ -13,50 +11,16 @@ library(dplyr)
 
 Load vis_mod object 
 ```{r}
-# Load data (Seurat object with corrected image size)
-vis_mod <- readRDS(file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "all_samples_cropped_img.rds"))
+# Load data (Seurat object with corrected tissue hires image size)
+vis_mod <- readRDS(file = paste0("my_path_to_Seurat_object", "all_samples_cropped_img.rds"))
 ```
 
-```{r}
-# Create a data frame mapping section_id to Patient_ID and Method
-id_map <- data.frame(
-  section_id = c("4335_3D_R1L_s2", "4335_3D_R1L_s1",  # Patient 1: standard first
-                 "4393_2H_R1S", "4393_2H_R1S_rep",     # Patient 2: standard, STAY
-                 "4419_3F_R1S", "4419_3F_R1S_rep",     # Patient 3: standard, STAY
-                 "4515_4L_R1L", "4515_4L_R1L_rep"),    # Patient 4: standard, STAY
-  patient = c("Patient_1", "Patient_1", 
-              "Patient_2", "Patient_2", 
-              "Patient_3", "Patient_3", 
-              "Patient_4", "Patient_4"),
-  method = c("standard", "STAY", 
-             "standard", "STAY", 
-             "standard", "STAY", 
-             "standard", "STAY")
-)
-
-# Add patient and method to metadata by matching sample_id
-vis_mod@meta.data$patient <- id_map$patient[match(vis_mod@meta.data$sample_id, id_map$section_id)]
-vis_mod@meta.data$method <- id_map$method[match(vis_mod@meta.data$sample_id, id_map$section_id)]
-
-# Create a unified label
-vis_mod@meta.data$patient_method <- paste0(vis_mod@meta.data$patient, "_", vis_mod@meta.data$method)
-
-# Ensure consistent factor ordering for section_id
-vis_mod@meta.data$sample_id <- factor(
-  vis_mod@meta.data$sample_id,
-  levels = id_map$section_id
-)
-
-# Check if order is consistent
-table(vis_mod@meta.data$sample_id, vis_mod@meta.data$method)
-
-```
 
 ```{r}
 #Load annotations
 load_annotations <- function(layer_name) {
   # List directories where annotation files are stored
-  dirs <- list.dirs("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/hard_vs_soft_coverslip/results/path_annotations/reworked_annotations",
+  dirs <- list.dirs("my_path_to_reworked_path_annotations",
                     recursive = FALSE, full.names = TRUE)
   
   # Process annotations for each sample section
@@ -160,27 +124,27 @@ Generating the spot annotation plots used in Supplementary figures 3 to 10
 
 ```{r}
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/epithelial_overview.png", width = 15*png_res, height = 8*png_res, res = png_res);print(epithelial_overview);dev.off()
+png(filename = "my_path/epithelial_overview.png", width = 15*png_res, height = 8*png_res, res = png_res);print(epithelial_overview);dev.off()
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/immune_overview.png", width = 15*png_res, height = 8*png_res, res = png_res);print(immune_overview);dev.off()
+png(filename = "my_path/immune_overview.png", width = 15*png_res, height = 8*png_res, res = png_res);print(immune_overview);dev.off()
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/stroma_overview.png", width = 15*png_res, height = 8*png_res, res = png_res);print(stroma_overview);dev.off()
+png(filename = "my_path/stroma_overview.png", width = 15*png_res, height = 8*png_res, res = png_res);print(stroma_overview);dev.off()
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/additional_overview.png", width = 15*png_res, height = 8*png_res, res = png_res);print(additional_overview);dev.off()
+png(filename = "my_path/additional_overview.png", width = 15*png_res, height = 8*png_res, res = png_res);print(additional_overview);dev.off()
 ```
 
 
 ```{r}
-#save Seurat object with loaded UPDATED annotations, UPDATED patients IDs and UPDATED methods 
+#save Seurat object with loaded UPDATED path annotations, UPDATED patients IDs and UPDATED methods 
 saveRDS(vis_mod,
-        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
+        file = paste0("/my_path/", "vis_mod_anno.rds"))
 ```
 
 ```{r}
-vis_mod_anno <- readRDS(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
+vis_mod_anno <- readRDS(paste0("/my_path/", "vis_mod_anno.rds"))
 ```
 
 Preparing spot annotation plots for Figure 1 C1-4 and F1-4
@@ -198,8 +162,6 @@ annotation_colors <- c(
   "fibrous" = "#46f0f0",    # blue
   "epithelial" = "#f58231"  # orange
 )
-# Here we use the & operator from the patchwork R package to add a theme
-# You can find more details in the 'advanced' tutorial
 
 section_8 <- MapLabels(vis_mod_anno, column_name = "Stroma_Anno", colors = annotation_colors, pt_size = 1.3, pt_alpha = 1, section_number = 8, ncol = 1) & #Section_number 8 corresponds to the Patient 4 prepared with the STAY method. 
   theme(legend.position = "right")
@@ -207,21 +169,18 @@ section_8 <- MapLabels(vis_mod_anno, column_name = "Stroma_Anno", colors = annot
 print(section_8)
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/section_8_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_8);dev.off()
+png(filename = "/my_path/section_8_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_8);dev.off()
 
-#The same can be done with the Epithelial_Anno and Immune_Anno. The immune and epithelial layers stored in the metadata in the Seurat object. 
 ```
 
 ```{r}
-# Here we use the & operator from the patchwork R package to add a theme
-# You can find more details in the 'advanced' tutorial
 section_7 <- MapLabels(vis_mod_anno, column_name = "Stroma_Anno", pt_size = 1.3, pt_alpha = 1, colors = annotation_colors, section_number = 7, ncol = 1) &
   theme(legend.position = "right")
 
 print(section_7)
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/section_7_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_7);dev.off()
+png(filename = "/my_path/section_7_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_7);dev.off()
 ```
 
 ```{r}
@@ -231,7 +190,7 @@ section_1 <- MapLabels(vis_mod_anno, column_name = "Stroma_Anno", pt_size = 1.3,
 print(section_1)
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/section_1_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_1);dev.off()
+png(filename = "/my_path/section_1_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_1);dev.off()
 ```
 
 ```{r}
@@ -240,8 +199,9 @@ section_2 <- MapLabels(vis_mod_anno, column_name = "Stroma_Anno", pt_size = 1.3,
 print(section_2)
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/section_2_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_2);dev.off()
+png(filename = "/my_path/section_2_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_2);dev.off()
 ```
+
 ```{r}
 section_3 <- MapLabels(vis_mod_anno, column_name = "Stroma_Anno", colors = annotation_colors, pt_size = 2, pt_alpha = 1, section_number = 3, ncol = 1) &
   theme(legend.position = "right")
@@ -249,7 +209,7 @@ section_3 <- MapLabels(vis_mod_anno, column_name = "Stroma_Anno", colors = annot
 print(section_3)
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/section_3_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_3);dev.off()
+png(filename = "/my_path/section_3_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_3);dev.off()
 
 ```
 
@@ -260,7 +220,7 @@ section_4 <- MapLabels(vis_mod_anno, column_name = "Stroma_Anno", pt_size = 2, p
 print(section_4)
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/section_4_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_4);dev.off()
+png(filename = "/my_path/section_4_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_4);dev.off()
 ```
 
 ```{r}
@@ -270,7 +230,7 @@ section_5 <- MapLabels(vis_mod_anno, column_name = "Stroma_Anno", pt_size = 2, p
 print(section_5)
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/section_5_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_5);dev.off()
+png(filename = "/my_path/section_5_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_5);dev.off()
 ```
 
 ```{r}
@@ -279,36 +239,12 @@ section_6 <- MapLabels(vis_mod_anno, column_name = "Stroma_Anno", pt_size = 2, p
 print(section_6)
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/section_6_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_6);dev.off()
+png(filename = "/my_path/section_6_spot_annotation.png", width = 15*png_res, height = 8*png_res, res = png_res);print(section_6);dev.off()
 
 ```
 
-
-```{r}
-# Plot the H&E image for athe object
-ImagePlot(vis_mod)
-```
-
-```{r}
-#save Seurat object with loaded UPDATED annotations, UPDATED patients IDs and UPDATED methods 
-saveRDS(vis_mod,
-        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
-```
-
-
-Load vis_mod object 
-```{r}
-# Load data (new Seurat object modified by Sophie) with my added annotations
-vis_mod <- readRDS(file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
-```
-
-
-Violin plots per layer Figure 3
+Violin plots per layer Figure 3J and 3K
 Epithelial 
-
-```{r}
-vis_mod_anno <- readRDS(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
-```
 
 ```{r}
 # Subset based on the annotation using an expession for all spots annotated I have not only invasive, in situ and normal spots but also bening. 
@@ -324,7 +260,6 @@ plot.df1 <- vis_mod_epithelial@meta.data %>%
     method = as.factor(method),
     patient = as.factor(patient) #replace sample_id with patient
   )
-#str(plot.df1): Displays the structure of plot.df1, showing each column's name, data type (e.g., factor, numeric, etc.), and a preview of its values.
 ```
 
 ```{r fig.width=10, fig.height=8}
@@ -345,38 +280,11 @@ p_epithelial <- ggplot(plot.df1, aes(y = nCount_Spatial, x = patient, fill = met
 print(p_epithelial)
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/epithelial_comparison.png", width = 10*png_res, height = 8*png_res, res = png_res);print(p_epithelial);dev.off()
+png(filename = "/my_path/epithelial_comparison.png", width = 10*png_res, height = 8*png_res, res = png_res);print(p_epithelial);dev.off()
 
 ```
 
-```{r}
-# Subset Seurat object
-vis_mod_immune <- SubsetSTData(vis_mod_anno, expression = Immune_Anno %in% c("lymphocytes_aggregate", "lymphocytes_high", "lymphocytes_low"))
-
-# Prepare metadata
-plot.df_immune <- vis_mod_immune@meta.data %>%
-  mutate(
-    log_nCount = log1p(nCount_Spatial),
-    Immune_Anno = as.factor(Immune_Anno),
-    method = as.factor(method),
-    patient = as.factor(patient)
-  )
-
-# Plot
-p_immune <- ggplot(plot.df_immune, aes(y = nCount_Spatial, x = patient, fill = method)) +
-  geom_violin(trim = FALSE, scale = "width", width = 1) +
-  geom_boxplot(width = 0.2, outlier.shape = NA, position = position_dodge(width = 1)) +
-  labs(title = "Log-transformed UMI Count Distribution in Immune Layer",
-       x = "Patient", y = "Log-transformed UMI Count") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-print(p_immune)
-
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/immune_comparison.png", width = 15*png_res, height = 8*png_res, res = png_res);print(p_immune);dev.off()
-```
-
-#testing scales for stroma layer
+#Stroma
 
 ```{r fig.width=10, fig.height=8}
 vis_mod_stroma <- SubsetSTData(vis_mod_anno, expression = Stroma_Anno %in% c("adipose", "desmoplastic", "fibrous"))
@@ -403,7 +311,7 @@ p_stroma <- ggplot(plot.df_stroma, aes(y = log_nCount, x = patient, fill = metho
 print(p_stroma)
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/updated_reworked_annotations/stroma_comparisonlog10.png", width = 10*png_res, height = 8*png_res, res = png_res);print(p_stroma);dev.off()
+png(filename = "/my_path/stroma_comparisonlog10.png", width = 10*png_res, height = 8*png_res, res = png_res);print(p_stroma);dev.off()
 ```
 
 ```{r}
@@ -413,9 +321,6 @@ p <- ggplot(vis_mod_epithelial@meta.data, aes(x = patient, fill = method)) +
   theme_minimal()
 
 ```
-
-
-Now I need to check the counts in the updated epithelial layer. Would be also good to compare the stroma layer. 
 
 ```{r}
 #library(dplyr)
@@ -453,8 +358,9 @@ vis_mod_anno@meta.data %>%
   arrange(factor(sample_id, levels = unique(vis_mod_anno$sample_id)))
 
 ```
+
 ```{r}
-#Nb of adipose spots
+#Nb of fibrous spots
 vis_mod_anno@meta.data %>%
   filter(Stroma_Anno == "fibrous") %>%
   group_by(sample_id) %>%
