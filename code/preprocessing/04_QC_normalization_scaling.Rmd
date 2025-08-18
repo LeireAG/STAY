@@ -8,10 +8,9 @@ library(tidyverse)
 library(dplyr)
 ```
 
-
 ```{r}
 # Load data (Seurat object with corrected image size and path annotations) 
-vis_mod <- readRDS(file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
+vis_mod <- readRDS(file = paste0("my_path_to_Seurat_object", "vis_mod_anno.rds"))
 ```
 
 1.QC
@@ -51,8 +50,11 @@ head(vis_mod$percent.plat) #The percentage is almost 0
 Plot QC
 
 ```{r, fig.width = 15, fig.height = 8}
-feats <- c("nFeature_Spatial", "nCount_Spatial", "percent.mito", "percent.hemo", "percent.plat")
-QC_all_samples <- VlnPlot(vis_mod, group.by = "sample_id", split.by = "method", features = feats, pt.size = 0.1, ncol = 5)
+feats <- c("nFeature_Spatial", "nCount_Spatial", "percent.mito", "percent.hemo")
+QC_all_samples <- VlnPlot(vis_mod_anno, group.by = "sample_id", split.by = "method", features = feats, pt.size = 0.1, ncol = 5)
+
+png_res <- 1200
+png(filename = "my_path/QC_all_samples.png", width = 15*png_res, height = 8*png_res, res = png_res);print(QC_all_samples);dev.off()
 ```
 
 Plot spatially to understand ViolinPlots
@@ -62,18 +64,11 @@ m <- MapFeatures(vis_mod_norm, features = "percent.mito", cols = c("lightgray", 
 m
 ```
 
-
-Yay! Save as PNG 
-```{r}
-png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/QC_all_samples.png", width = 15*png_res, height = 8*png_res, res = png_res);print(QC_all_samples);dev.off()
-```
-
 #### Save object
 
 ```{r}
 saveRDS(vis_mod,
-        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno_QC.rds"))
+        file = paste0("/my_path/", "vis_mod_anno_QC.rds"))
 ```
 
 2. Normalize Data and Find Variable Genes. 
@@ -125,14 +120,11 @@ UMAP <- DimPlot(
   reduction = "umap",
   group.by = "sample_id"
 ) + ggplot2::ggtitle("UMAP on PCA")
-```
-Yay! Save as PNG 
-```{r}
+
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/UMAP.png", width = 15*png_res, height = 8*png_res, res = png_res);print(UMAP);dev.off()
+png(filename = "/my_path/UMAP.png", width = 15*png_res, height = 8*png_res, res = png_res);print(UMAP);dev.off()
 ```
 
-Testing if normalizing and scaling helps at all. It did!!! Same scale :D
 ```{r}
 KRT5_plot <- MapFeatures(vis_mod_norm,
             colors = RColorBrewer::brewer.pal(n = 9, name = "Reds"),
@@ -146,19 +138,14 @@ KRT5_plot <- MapFeatures(vis_mod_norm,
             pt_stroke = NA,
             pt_size = 1,
             slot = "counts")
-```
 
-Yay! Save as PNG 
-```{r}
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/KRT5_plot_on_scaled_data.png", width = 15*png_res, height = 8*png_res, res = png_res);print(KRT5_plot);dev.off()
+png(filename = "/my_path/KRT5_plot_on_scaled_data.png", width = 15*png_res, height = 8*png_res, res = png_res);print(KRT5_plot);dev.off()
 ```
-
- 
 
 ```{r}
 #### Save object
 saveRDS(vis_mod_norm,
-        file = paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/new_object/", "vis_mod_norm.rds"))
+        file = paste0("/my_path/", "vis_mod_norm.rds"))
 ```
 
