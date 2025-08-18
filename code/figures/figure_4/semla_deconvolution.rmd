@@ -14,8 +14,8 @@ library(heatmap3)
 
 ```{r}
 # load Garvan atlas
-garvan <- readRDS("/data/m.abreumachado/simplex/objects/miniatlas.rds")
-merged <- readRDS("/home/m.abreumachado/local_analysis/simplex/annotated_cohort/leirethings_hardcover/vis_mod_nmf.rds")## your merged object with multiple samples 
+garvan <- readRDS("/your_path/miniatlas.rds")
+merged <- readRDS("/your_path/vis_mod_nmf.rds")## your merged object with multiple samples 
 samples <- unique(merged$sample_id)
 
 # ref steps 
@@ -58,7 +58,7 @@ for (sample in samples) {
 
 # Merge non-HD sample plots into a final plot
 final_plot <- patchwork::wrap_plots(sample_plots, ncol = 1)
-ggsave(paste0("/home/m.abreumachado/local_analysis/simplex/annotated_cohort/leirethings_hardcover/", "map/", "garvan_major_map.jpg"), final_plot, height = 35, width = 25, dpi = 300, limitsize = FALSE)
+ggsave(paste0("/your_path/", "map/", "garvan_major_map.jpg"), final_plot, height = 35, width = 25, dpi = 300, limitsize = FALSE)
 ```
 
 ### run minor cell types 
@@ -98,7 +98,7 @@ for (sample in samples) {
 
 # Merge non-HD sample plots into a final plot
 final_plot <- patchwork::wrap_plots(sample_plots, ncol = 1)
-ggsave(paste0("/home/m.abreumachado/local_analysis/simplex/annotated_cohort/leirethings_hardcover/", "map/", "garvan_minor_map.jpg"), final_plot, height = 35, width = 120, dpi = 300, limitsize = FALSE)
+ggsave(paste0("/your_path/", "map/", "garvan_minor_map.jpg"), final_plot, height = 35, width = 120, dpi = 300, limitsize = FALSE)
 ```
 
 ### merge 
@@ -107,9 +107,9 @@ merged <- MergeSTData(spls[[1]], spls[-1], merge_dr = "nmf")
 ```
 
 ```{r}
-features <- paste0("NMF_", 1:23)
+features <- paste0("NMF_", 1:24)
 ggsave(
-    "/home/m.abreumachado/local_analysis/simplex/annotated_cohort/leirethings_hardcover/map/nmf.jpg",
+    "/your_path/map/nmf.jpg",
     plot = MapFeatures(merged, features = features, colors = viridis::turbo(11), label_by = "sample_id", pt_size = pt_size, override_plot_dims = TRUE, scale = "shared", ncol = length(features))
     , height = 30, width = 60, dpi = 300, limitsize = FALSE
     )
@@ -127,7 +127,7 @@ nmf_matrix <- nmf_matrix[shared_rownames, , drop = FALSE]
 celltype_matrix <- celltype_matrix[shared_rownames, , drop = FALSE]
 correlation_matrix <- cor(nmf_matrix, celltype_matrix, method = "spearman")
 
-pdf("/home/m.abreumachado/local_analysis/simplex/annotated_cohort/leirethings_hardcover/map/nmf_minor_celltype_correlation.pdf", width = 10, height = 10)
+pdf("/your_path/nmf_minor_celltype_correlation.pdf", width = 10, height = 10)
     heatmap3(correlation_matrix, 
     margins = c(12, 10))
 dev.off()
@@ -135,46 +135,6 @@ dev.off()
 
 ### save merged object with deconvolutions 
 ```{r}
-saveRDS(merged, "/home/m.abreumachado/local_analysis/simplex/annotated_cohort/leirethings_hardcover/vis_mod_nmf_decon.rds")
+saveRDS(merged, "/your_path/vis_mod_nmf_decon.rds")
 ```
-
-### composite plot of some cell types represented.
-#```{r}
-
-DefaultAssay(merged) <- "garvan_major_map" # mod here accordingly 
-features <- c("T-cells", "B-cells", "CAFs")
-cols <- c("#1f78b4","#e31a1c", "#33a02c")
-
-# workaround due to bug 
-missing_cells <- colnames(merged)[colSums(is.na(merged@assays$garvan_major_map@data)) > 0] # mod here accordingly
-merged <- merged[,!colnames(merged) %in% missing_cells]
-keep_cells <- colnames(merged)
-meta <- merged@tools$Staffli@meta_data
-meta_filtered <- dplyr::filter(meta, barcode %in% keep_cells)
-merged@tools$Staffli@meta_data <- meta_filtered
-
-pt_size_map <- list(
-    "4335_3D_R1L" = 1,
-    "4393_2H_R1S" = 1.5,
-    "4419_3F_R1S" = 1.5,
-    "4515_4L_R1L" = 1
-)
-sample_plots <- list()
-
-#for (pair in names(pt_size_map)) {
-    tokeep <- colnames(merged)[grepl(pair, merged$sample_id)]
-    toplot <- SubsetSTData(merged, spots = tokeep)
-    pt_size <- pt_size_map[[pair]]
-    p <- MapMultipleFeatures(toplot, features = features, label_by = "sample_id", ncol = 2, pt_size = pt_size, pt_stroke = 0.1, colors = cols, scale = "free", max_cutoff = 0.99)
-    sample_plots[[pair]] <- p
-#}
-# Merge all sample plots into a single plot
-final_plot <- patchwork::wrap_plots(sample_plots, ncol = 1)
-ggsave("/data/m.abreumachado/simplex/composite_celltypes_merged.jpg", final_plot, height = 20, width = 15, dpi = 300, limitsize = FALSE)
-#```
-
-```{r}
-vis_mod_nmf_decon <- readRDS(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/new_object/", "vis_mod_nmf_decon.rds"))
-```
-
 
