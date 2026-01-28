@@ -13,6 +13,11 @@ library(dplyr)
 vis_mod <- readRDS(file = paste0("my_path_to_Seurat_object", "vis_mod_anno.rds"))
 ```
 
+```{r}
+# Load data (Seurat object with corrected image size and path annotations) and filtered spots artifacts
+vis_mod <- readRDS(file = paste0("my_path_to_Seurat_object", "vis_mod_nmf_decon.rds"))
+```
+
 1.QC
 
 ```{r}
@@ -29,11 +34,27 @@ mt.genes <- grep(pattern = "^MT-", x = rownames(vis_mod), value = TRUE)
 vis_mod$percent.mito <- (Matrix::colSums(vis_mod@assays$RNA@counts[mt.genes,])/Matrix::colSums(vis_mod@assays$RNA@counts))*100
 head(vis_mod$percent.mito) # There is only 1 to 5% of mitochrondial genes cause these are not included in the 10x gen pannel.
 
+mito_summary <- vis_mod@meta.data %>%
+  dplyr::group_by(patient_method) %>%           # or patient_method, or whatever identifies your section
+  dplyr::summarise(
+    mean_percent_mito = mean(percent.mito, na.rm = TRUE),
+    median_percent_mito = median(percent.mito, na.rm = TRUE),
+    sd_percent_mito = sd(percent.mito, na.rm = TRUE),
+    min_percent_mito = min(percent.mito, na.rm = TRUE),
+    max_percent_mito = max(percent.mito, na.rm = TRUE)
+  )
+mito_summary
+
 # Ribosomal
 # Collect all genes coding for ribosomal proteins
 rp.genes <- grep(pattern = "^RP[SL]", x = rownames(vis_mod), value = TRUE)
 vis_mod$percent.ribo <- (Matrix::colSums(vis_mod@assays$RNA@counts[rp.genes,])/Matrix::colSums(vis_mod@assays$RNA@counts))*100
 head(vis_mod$percent.ribo)  # There is no ribosomal genes cause these are not included in the 10x gen pannel.
+
+ribo_summary <- vis_mod@meta.data %>%
+  group_by(patient_method) %>%
+  summarise(mean_percent_ribo = mean(percent.ribo, na.rm = TRUE))
+ribo_summary
 
 # Percentage hemoglobin genes - includes all genes starting with HB except HBP.
 #Collect hemoglobin protein coding genes
@@ -45,13 +66,15 @@ head(vis_mod$percent.hemo) # The percentage of hemo genes is like 0%
 plat.genes <- grep(pattern = "PECAM1|PF4", x = rownames(vis_mod), value = TRUE)
 vis_mod$percent.plat <- (Matrix::colSums(vis_mod@assays$RNA@counts[plat.genes,])/Matrix::colSums(vis_mod@assays$RNA@counts))*100
 head(vis_mod$percent.plat) #The percentage is almost 0
+
 ```
 
 Plot QC
 
 ```{r, fig.width = 15, fig.height = 8}
 feats <- c("nFeature_Spatial", "nCount_Spatial", "percent.mito", "percent.hemo")
-QC_all_samples <- VlnPlot(vis_mod_anno, group.by = "sample_id", split.by = "method", features = feats, pt.size = 0.1, ncol = 5)
+QC_all_samples <- VlnPlot(vis_mod, group.by = "sample_id", split.by = "method", features = feats, pt.size = 0.1, ncol = 5)
+QC_all_samples
 
 png_res <- 1200
 png(filename = "my_path/QC_all_samples.png", width = 15*png_res, height = 8*png_res, res = png_res);print(QC_all_samples);dev.off()
@@ -60,7 +83,7 @@ png(filename = "my_path/QC_all_samples.png", width = 15*png_res, height = 8*png_
 Plot spatially to understand ViolinPlots
 
 ```{r}
-m <- MapFeatures(vis_mod_norm, features = "percent.mito", cols = c("lightgray", "mistyrose", "red", "dark red", "black"), pt.size = 0.1, ncol = 4) #something is happening with the pt.size
+m <- MapFeatures(vis_mod, features = "percent.mito", cols = c("lightgray", "mistyrose", "red", "dark red", "black"), pt.size = 0.1, ncol = 4) #something is happening with the pt.size
 m
 ```
 
@@ -77,7 +100,7 @@ saveRDS(vis_mod,
 vis_mod_norm <- vis_mod |> 
   NormalizeData() |> 
 #We need to define which features/genes are important in our dataset to perform PCA or clustering not necessary here. 
-  #FindVariableFeatures()
+  FindVariableFeatures()
 ```
 
 Scaling the data by centering the data and scaling (Z-score)
@@ -85,6 +108,27 @@ Scaling the data by centering the data and scaling (Z-score)
 ```{r}
 #Since each gene has a different expression level, it means that genes with higher expression values will naturally have higher variation that will be captured by PCA. This means that we need to somehow give each gene a similar weight when performing PCA
 vis_mod_norm <- ScaleData(vis_mod_norm)
+```
+
+2.1 Alternative - Normalizing data with SCT
+
+```{r}
+#SCTransform() models technical noise better than log-normalization (NormalizeData()), especially for variable tissue quality or library depth.
+# Set the default assay to your new one
+DefaultAssay(vis_mod) <- "RNA3"
+
+# Compute total UMI counts per spot
+umi <- Matrix::colSums(GetAssayData(vis_mod, assay = "RNA3", slot = "counts"))
+
+# Identify spots with zero counts (no expression)
+sum(umi == 0)  # just to check how many
+
+# Keep only spots with >0 counts
+keep_cells <- names(umi)[umi > 0]
+vis_mod_wo0 <- subset(vis_mod, cells = keep_cells)
+
+# Run SCTransform 
+vis_mod_SCT <- SCTransform(vis_mod_wo0, assay = "RNA3")
 ```
 
 3. Dimensionality reduction Run PCA() on variable genes to capture main sources of variation
@@ -120,9 +164,36 @@ UMAP <- DimPlot(
   reduction = "umap",
   group.by = "sample_id"
 ) + ggplot2::ggtitle("UMAP on PCA")
+UMAP
+
+# Publicaton-friendly UMAP
+UMAP2 <- DimPlot(
+  vis_mod_norm,
+  reduction = "umap",
+  group.by = "patient",
+  shape.by = "method"
+) +
+  scale_color_brewer(palette = "Set2") +
+  theme_minimal(base_size = 14)
+UMAP2
+
+UMAP3 <- DimPlot(
+  vis_mod_norm,
+  reduction = "umap",
+  group.by = "patient_method"
+) +
+ scale_color_brewer(palette = "Set2") + ggplot2::ggtitle("UMAP on PCA") +
+    theme(
+    panel.grid = element_blank(),                 # remove gridlines
+    panel.border = element_blank(),               # remove border
+    axis.line = element_line(color = "black"),    # keep clean axes
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  )
+
+UMAP3
 
 png_res <- 1200
-png(filename = "/my_path/UMAP.png", width = 15*png_res, height = 8*png_res, res = png_res);print(UMAP);dev.off()
+png(filename = "//Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/UMAP3.png", width = 12*png_res, height = 8*png_res, res = png_res);print(UMAP3);dev.off()
 ```
 
 ```{r}

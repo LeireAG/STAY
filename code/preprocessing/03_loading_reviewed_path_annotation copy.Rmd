@@ -144,7 +144,7 @@ saveRDS(vis_mod,
 ```
 
 ```{r}
-vis_mod_anno <- readRDS(paste0("/my_path/", "vis_mod_anno.rds"))
+vis_mod_anno <- readRDS(paste0("/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/output/rds_objects/", "vis_mod_anno.rds"))
 ```
 
 Preparing spot annotation plots for Figure 1 C1-4 and F1-4
@@ -251,6 +251,7 @@ Epithelial
 vis_mod_epithelial <- SubsetSTData(vis_mod_anno, expression = Epithelial_Anno %in% c("invasive", "in_situ", "normal", "benign"))
 ```
 
+
 ```{r}
 # Now, plot.df1 will contain the metadata with epithelial anno, method, and sample_id columns as factors, alongside the newly created log_nCount column. You can then use this plot.df1 data frame for plotting or further analysis.
 plot.df1 <- vis_mod_epithelial@meta.data %>% 
@@ -291,27 +292,30 @@ vis_mod_stroma <- SubsetSTData(vis_mod_anno, expression = Stroma_Anno %in% c("ad
 
 plot.df_stroma <- vis_mod_stroma@meta.data %>%
   mutate(
-    log_nCount = log10(nCount_Spatial + 1),
-    #log1p(nCount_Spatial), natural log
+    #log_nCount = log10(nCount_Spatial + 1),
+    log1p(nCount_Spatial), #natural log
     Stroma_Anno = as.factor(Stroma_Anno),
     method = as.factor(method),
     patient = as.factor(patient)
   )
 
-p_stroma <- ggplot(plot.df_stroma, aes(y = log_nCount, x = patient, fill = method)) +
+p_stroma <- ggplot(plot.df_stroma, aes(y = nCount_Spatial, x = patient, fill = method)) +
+  #aes(y = log_nCount, x = patient, fill = method)) +
   geom_violin(trim = FALSE, scale = "width", width = 1) +
-  geom_boxplot(width = 0.1, outlier.shape = NA, position = position_dodge(width = 1)) +
-  labs(title = "Log-transformed UMI Count Distribution in Stroma Layer",
-       x = "Patient", y = "log10(UMI count + 1)") +
+  geom_boxplot(width = 0.1, outlier.shape = NA, position = position_dodge(width = 1)) + labs(
+    title = "Total UMI Count Distribution in Stromal Regions", x = "Patient", y = "Total UMI counts per spot") +
+  #labs(title = "Log-transformed UMI Count Distribution in Stroma Layer", x = "Patient", y = "log10(UMI count + 1)") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  #scale_y_continuous(limits = c(0, 7000)) +  # adjust this limit to match main figures
   scale_fill_manual(values = c("STAY" = "#FBB4AE",  # pastel red
                              "standard" = "#B3CDE3"))  # pastel blue
 
 print(p_stroma)
 
 png_res <- 1200
-png(filename = "/my_path/stroma_comparisonlog10.png", width = 10*png_res, height = 8*png_res, res = png_res);print(p_stroma);dev.off()
+#png(filename = "/my_path/stroma_comparisonlog10.png", width = 10*png_res, height = 8*png_res, res = png_res);print(p_stroma);dev.off()
+png(filename = "/my_path/stroma_comparisonraw.png", width = 10*png_res, height = 8*png_res, res = png_res);print(p_stroma);dev.off()
 ```
 
 ```{r}

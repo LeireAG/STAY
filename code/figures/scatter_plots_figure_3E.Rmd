@@ -1,0 +1,365 @@
+
+---
+```{r}
+library(semla)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(patchwork)
+```
+
+```{r}
+# Load data 
+vis_mod_norm <- readRDS(file = paste0("my_path_to_Seurat_object", "vis_mod_nmf_decon.rds"))
+# Normalization applies to gene expression values, not to the count of detected genes
+```
+
+```{r}
+#Check which assay was normalized. DO NOT USE normalized data for this type of plots. 
+vis_mod_norm@commands$NormalizeData
+
+# ---- Gene attributes from RAW counts ----
+
+# Subset raw RNA counts by protocol
+umis_standard <- GetAssayData(vis_mod_norm, assay = "RNA3", slot = "counts")[, 
+                            vis_mod_norm$method == "soft_cover"]
+
+umis_STAY <- GetAssayData(vis_mod_norm, assay = "RNA3", slot = "counts")[, 
+                        vis_mod_norm$method == "hard_cover"]
+
+# Build gene-level attributes
+gene_attr <- data.frame(
+  standard_count = rowSums(umis_standard),
+  STAY_count = rowSums(umis_STAY),
+  standard_det_rate = rowMeans(umis_standard > 0),
+  STAY_det_rate = rowMeans(umis_STAY > 0)
+)
+
+# Log-transform counts (for plotting and correlation)
+gene_attr <- gene_attr %>%
+  mutate(
+    standard_log_count = log1p(standard_count),
+    STAY_log_count = log1p(STAY_count)
+  )
+
+# Scatter plot of mean log1p(UMI counts)
+pt1 <- ggplot(gene_attr, aes(x = standard_log_count, y = STAY_log_count)) +
+  geom_point(size = 0.4, alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  coord_equal() +
+  theme_minimal() +
+  labs(x = "Standard protocol (log1p UMI)",
+       y = "STAY (log1p UMI)",
+       title = "Gene capture sensitivity")
+
+
+# Scatter plot of detection rate
+pt2 <- ggplot(gene_attr, aes(x = standard_det_rate, y = STAY_det_rate)) +
+  geom_point(size = 0.4, alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "longdash") +
+  ggpubr::stat_cor(method = "pearson", digits = 2, size = 3) +
+  labs(x = "Standard protocol", y = "STAY", title = "Gene detection rate") +
+  coord_equal() +
+  theme_minimal(base_size = 13)
+
+(pt1 | pt2) + plot_annotation(title = "Comparison of gene sensitivity: STAY vs Standard")
+
+```
+#Per sample gene level correlation
+
+```{r}
+# Pull RAW gene counts 
+counts <- GetAssayData(vis_mod_norm, assay = "RNA3", slot = "counts")
+meta   <- vis_mod_norm@meta.data
+
+stay_spots <- rownames(meta)[meta$sample_id == "clinical_id_1_STAY"]
+std_spots  <- rownames(meta)[meta$sample_id == "clinical_id_1_standard"]
+length(stay_spots)
+length(std_spots)
+
+# Gene-level attributes from RAW counts
+gene_attr <- data.frame(
+  standard_count = rowSums(counts[, std_spots, drop = FALSE]),
+  STAY_count     = rowSums(counts[, stay_spots, drop = FALSE])
+)
+
+
+# Log-transform (for correlation + plotting)
+gene_attr <- gene_attr %>%
+  mutate(
+    standard_log_count = log1p(standard_count),
+    STAY_log_count     = log1p(STAY_count)
+  )
+
+#Get correlation
+#Pearson correlation asks: Do genes that have high detection in the standard protocol also have high detection in STAY, and vice versa?
+
+cor(gene_attr$standard_log_count,
+    gene_attr$STAY_log_count,
+    use = "complete.obs")
+
+# Detection rate (optional but useful)
+gene_attr$standard_det_rate <- rowMeans(counts[, std_spots, drop = FALSE] > 0)
+gene_attr$STAY_det_rate     <- rowMeans(counts[, stay_spots, drop = FALSE] > 0)
+
+```
+
+# Plotting
+
+```{r}
+#library(ggplot2)
+#library(ggpubr)
+
+p1 <- ggplot(gene_attr, aes(x = standard_log_count, y = STAY_log_count)) +
+  geom_point(size = 0.4, alpha = 0.6, color = "black") +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "longdash") +  # diagonal = perfect agreement
+  #geom_ribbon(aes(ymin = 0, ymax = 1), xmin = 0, xmax = 1, fill = "grey90", alpha = 0.3) + # subtle background
+  ggpubr::stat_cor(method = "pearson", digits = 3, size = 3) +
+  labs(
+    x = "Standard protocol (log1p UMI)",
+    y = "STAY (log1p UMI)",
+    title = "Patient_1 Method sensitivity"
+  ) +
+  coord_equal() +
+  theme_minimal(base_size = 13)
+
+p1
+
+p1_det <- ggplot(gene_attr, aes(x = standard_det_rate, y = STAY_det_rate)) +
+  geom_point(size = 0.4, alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "longdash") +
+  ggpubr::stat_cor(method = "pearson", digits = 2, size = 3) +
+  labs(x = "Standard protocol", y = "STAY", title = "Gene detection rate") +
+  coord_equal() +
+  theme_minimal(base_size = 13)
+p1_det
+
+p1 + p1_det
+```
+
+```{r}
+# save plots as JPEG
+jpeg(filename = "/my_path/patient1_gene_scatter_counts.jpg", width = 1000, height = 1000, res = 300)
+print(p1)
+dev.off()
+jpeg(filename = "/my_path/patient1_gene_scatter_det_rate.jpg", width = 1000, height = 1000, res = 300)
+print(p1_det)
+dev.off()
+```
+
+
+```{r}
+stay_spots <- rownames(meta)[meta$sample_id == "clinical_id_2_STAY"]
+std_spots  <- rownames(meta)[meta$sample_id == "clinical_id_2_standard"]
+length(stay_spots)
+length(std_spots)
+
+# Gene-level attributes from RAW counts
+gene_attr <- data.frame(
+  standard_count = rowSums(counts[, std_spots, drop = FALSE]),
+  STAY_count     = rowSums(counts[, stay_spots, drop = FALSE])
+)
+
+
+# Log-transform (for correlation + plotting)
+gene_attr <- gene_attr %>%
+  mutate(
+    standard_log_count = log1p(standard_count),
+    STAY_log_count     = log1p(STAY_count)
+  )
+
+#Get correlation
+#Pearson correlation asks: Do genes that have high detection in the standard protocol also have high detection in STAY, and vice versa?
+
+cor(gene_attr$standard_log_count,
+    gene_attr$STAY_log_count,
+    use = "complete.obs")
+
+# Detection rate (optional but useful)
+gene_attr$standard_det_rate <- rowMeans(counts[, std_spots, drop = FALSE] > 0)
+gene_attr$STAY_det_rate     <- rowMeans(counts[, stay_spots, drop = FALSE] > 0)
+
+```
+
+# Plotting
+
+```{r}
+p2 <- ggplot(gene_attr, aes(x = standard_log_count, y = STAY_log_count)) +
+  geom_point(size = 0.4, alpha = 0.6, color = "black") +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "longdash") +  # diagonal = perfect agreement
+  #geom_ribbon(aes(ymin = 0, ymax = 1), xmin = 0, xmax = 1, fill = "grey90", alpha = 0.3) + # subtle background
+  ggpubr::stat_cor(method = "pearson", digits = 3, size = 3) +
+  labs(
+    x = "Standard protocol (log1p UMI)",
+    y = "STAY (log1p UMI)",
+    title = "Patient_2 Method sensitivity"
+  ) +
+  coord_equal() +
+  theme_minimal(base_size = 13)
+
+
+p2_det <- ggplot(gene_attr, aes(x = standard_det_rate, y = STAY_det_rate)) +
+  geom_point(size = 0.4, alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "longdash") +
+  ggpubr::stat_cor(method = "pearson", digits = 2, size = 3) +
+  labs(x = "Standard protocol", y = "STAY", title = "Gene detection rate") +
+  coord_equal() +
+  theme_minimal(base_size = 13)
+
+
+p2 + p2_det
+
+```
+
+```{r}
+jpeg(filename = "/my_path/patient2_gene_scatter_counts.jpg", width = 1000, height = 1000, res = 300)
+print(p2)
+dev.off()
+jpeg(filename = "/my_path/patient2_gene_scatter_det_rate.jpg", width = 1000, height = 1000, res = 300)
+print(p2_det)
+dev.off()
+```
+
+```{r}
+stay_spots <- rownames(meta)[meta$sample_id == "clinical_id_3_STAY"]
+std_spots  <- rownames(meta)[meta$sample_id == "clinical_id_3_standard"]
+
+length(stay_spots)
+length(std_spots)
+
+# Gene-level attributes from RAW counts
+gene_attr <- data.frame(
+  standard_count = rowSums(counts[, std_spots, drop = FALSE]),
+  STAY_count     = rowSums(counts[, stay_spots, drop = FALSE])
+)
+
+# Log-transform (for correlation + plotting)
+gene_attr <- gene_attr %>%
+  mutate(
+    standard_log_count = log1p(standard_count),
+    STAY_log_count     = log1p(STAY_count)
+  )
+
+#Get correlation
+#Pearson correlation asks: Do genes that have high detection in the standard protocol also have high detection in STAY, and vice versa?
+
+cor(gene_attr$standard_log_count,
+    gene_attr$STAY_log_count,
+    use = "complete.obs")
+
+# Detection rate (optional but useful)
+gene_attr$standard_det_rate <- rowMeans(counts[, std_spots, drop = FALSE] > 0)
+gene_attr$STAY_det_rate     <- rowMeans(counts[, stay_spots, drop = FALSE] > 0)
+
+```
+
+# Plotting
+
+```{r}
+p3 <- ggplot(gene_attr, aes(x = standard_log_count, y = STAY_log_count)) +
+  geom_point(size = 0.4, alpha = 0.6, color = "black") +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "longdash") +  # diagonal = perfect agreement
+  #geom_ribbon(aes(ymin = 0, ymax = 1), xmin = 0, xmax = 1, fill = "grey90", alpha = 0.3) + # subtle background
+  ggpubr::stat_cor(method = "pearson", digits = 3, size = 3) +
+  labs(
+    x = "Standard protocol (log1p UMI)",
+    y = "STAY (log1p UMI)",
+    title = "Patient_3 Method sensitivity"
+  ) +
+  coord_equal() +
+  theme_minimal(base_size = 13)
+
+
+p3_det <- ggplot(gene_attr, aes(x = standard_det_rate, y = STAY_det_rate)) +
+  geom_point(size = 0.4, alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "longdash") +
+  ggpubr::stat_cor(method = "pearson", digits = 2, size = 3) +
+  labs(x = "Standard protocol", y = "STAY", title = "Gene detection rate") +
+  coord_equal() +
+  theme_minimal(base_size = 13)
+
+
+p3 + p3_det
+```
+```{r}
+jpeg(filename = "/my_path/patient3_gene_scatter_counts.jpg", width = 1000, height = 1000, res = 300)
+print(p3)
+dev.off()
+jpeg(filename = "/my_path/patient3_gene_scatter_det_rate.jpg", width = 1000, height = 1000, res = 300)
+print(p3_det)
+dev.off()
+```
+
+```{r}
+stay_spots <- rownames(meta)[meta$sample_id == "clinical_id_4_STAY"]
+std_spots  <- rownames(meta)[meta$sample_id == "clinical_id_4_standard"]
+
+length(stay_spots)
+length(std_spots)
+
+# Gene-level attributes from RAW counts
+gene_attr <- data.frame(
+  standard_count = rowSums(counts[, std_spots, drop = FALSE]),
+  STAY_count     = rowSums(counts[, stay_spots, drop = FALSE])
+)
+
+# Log-transform (for correlation + plotting)
+gene_attr <- gene_attr %>%
+  mutate(
+    standard_log_count = log1p(standard_count),
+    STAY_log_count     = log1p(STAY_count)
+  )
+
+#Get correlation
+#Pearson correlation asks: Do genes that have high detection in the standard protocol also have high detection in STAY, and vice versa?
+
+cor(gene_attr$standard_log_count,
+    gene_attr$STAY_log_count,
+    use = "complete.obs")
+
+# Detection rate (optional but useful)
+gene_attr$standard_det_rate <- rowMeans(counts[, std_spots, drop = FALSE] > 0)
+gene_attr$STAY_det_rate     <- rowMeans(counts[, stay_spots, drop = FALSE] > 0)
+```
+# Plotting
+
+```{r}
+p4 <- ggplot(gene_attr, aes(x = standard_log_count, y = STAY_log_count)) +
+  geom_point(size = 0.4, alpha = 0.6, color = "black") +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "longdash") + # diagonal = perfect agreement
+  #geom_ribbon(aes(ymin = 0, ymax = 1), xmin = 0, xmax = 1, fill = "grey90", alpha = 0.3) + # subtle background
+  ggpubr::stat_cor(method = "pearson", digits = 3, size = 3) +
+  scale_x_continuous(limits = c(0, max(max(gene_attr$`STAY_log_count`), max(gene_attr$standard_log_count)))) +
+  scale_y_continuous(limits = c(0, max(max(gene_attr$`STAY_log_count`), max(gene_attr$standard_log_count)))) +
+  labs(
+    x = "Standard protocol (log1p UMI)",
+    y = "STAY (log1p UMI)",
+    title = "Patient_4 Method sensitivity"
+  ) +
+  coord_equal() +
+  theme_minimal(base_size = 13)
+p4
+
+
+p4_det <- ggplot(gene_attr, aes(x = standard_det_rate, y = STAY_det_rate)) +
+  geom_point(size = 0.4, alpha = 0.6) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "longdash") +
+  ggpubr::stat_cor(method = "pearson", digits = 2, size = 3) +
+  labs(x = "Standard protocol", y = "STAY", title = "Gene detection rate") +
+  coord_equal() +
+  theme_minimal(base_size = 13)
+
+
+p4 + p4_det
+
+```
+
+```{r}
+jpeg(filename = "/my_path/patient4_gene_scatter_counts.jpg", width = 1000, height = 1000, res = 300)
+print(p4)
+dev.off()
+jpeg(filename = "/my_path/patient4_gene_scatter_det_rate.jpg", width = 1000, height = 1000, res = 300)
+print(p4_det)
+dev.off()
+```
+

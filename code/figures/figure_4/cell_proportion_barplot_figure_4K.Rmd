@@ -1,0 +1,295 @@
+---
+title: "cell_proportion_barplot"
+---
+
+```{r}
+library(semla)
+library(ggplot2)
+```
+
+```{r} 
+#Load data
+deconv <- readRDS(file = paste0("my_path", "vis_mod_nmf_decon.rds"))
+```
+
+```{r}
+#Check assays in seurat object 
+Assays(deconv)
+
+#Set the assay as default
+DefaultAssay(deconv) <- "garvan_major_map"
+
+#print first rows
+
+mat <- GetAssayData(deconv, assay = "garvan_major_map", slot = "data")
+head(mat)
+rownames(mat)
+dim(mat)
+
+matSums <- rowSums(mat)
+matSums
+
+#selecting one sample
+spots <- rownames(deconv@meta.data[deconv$sample_id== "clinical_id_4_standard", ])
+# Get the unique patient_method for this section
+label1 <- unique(deconv@meta.data[spots, "patient_method"])
+label1
+mat_section <- mat[, spots]
+head(mat_section)
+
+#sum of cell type proportion per spot (should equal 1)
+colSums(mat_section)[1:5]
+#sum of cell type proportion per cell type across all spots
+rowSums(mat_section)[1:5]
+mat_section_Sums <- rowSums(mat_section)
+#total contribution across all cell types and spots
+sum(rowSums(mat_section))
+
+```
+```{r}
+# Convert your cell-type sums to percentages
+
+celltype_percent <- (mat_section_Sums / sum(mat_section_Sums)) * 100
+celltype_percent
+round(celltype_percent, 2)
+
+```
+```{r}
+#barplot
+# convert to data.frame
+df <- data.frame(
+  cell_type = names(celltype_percent),
+  percentage = as.numeric(celltype_percent)
+)
+
+library(ggplot2)
+
+ggplot(df, aes(x = cell_type, y = percentage, fill = cell_type)) +
+  geom_bar(stat = "identity") +
+  ylab("Percentage (%)") +
+  xlab("Cell type") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+
+#stacked barplot
+ggplot(df, aes(x = "Section", y = percentage, fill = cell_type)) +
+  geom_bar(stat = "identity") +
+  ylab("Percentage (%)") +
+  xlab("") +
+  theme_minimal()
+
+
+```
+
+```{r}
+# compute percentages for Section 2
+#check ids: deconv@meta.data$sample_id
+spots <- rownames(deconv@meta.data[deconv$sample_id== "clinical_id_4_STAY", ])
+mat_section2 <- mat[, spots]
+# Get the unique patient_method for this section
+label2 <- unique(deconv@meta.data[spots, "patient_method"])
+label2
+
+
+#OBS! for some reason there were NA values in some spots instead of zeros and thus the sum operation would not work. Covert NAs to zeros. 
+mat_section2[is.na(mat_section2)] <- 0
+
+mat_section2[1:5, 1:5]
+
+colSums(mat_section2)[1:5]
+rowSums(mat_section2)[1:5]
+head(mat_section2)
+
+mat_section2_sums <- rowSums(mat_section2)
+total_sum <- sum(mat_section2_sums, na.rm = TRUE)
+celltype_percent2 <- (mat_section2_sums / total_sum) * 100
+
+
+mat_section2_Sums <- rowSums(mat_section2)
+celltype_percent2 <- (mat_section2_Sums / sum(mat_section2_Sums)) * 100
+celltype_percent2
+
+df2 <- data.frame(
+  cell_type = names(celltype_percent2),
+  percentage = as.numeric(celltype_percent2),
+  section = "Section_2"
+)
+
+#stacked barplot
+ggplot(df, aes(x = "Section", y = percentage, fill = cell_type)) +
+  geom_bar(stat = "identity") +
+  ylab("Percentage (%)") +
+  xlab("") +
+  theme_minimal()
+
+```
+
+```{r}
+#pairwise comparison
+df1 <- data.frame(
+  cell_type = names(celltype_percent),
+  percentage = as.numeric(celltype_percent),
+  section = "Section_1"
+)
+
+df2 <- data.frame(
+  cell_type = names(celltype_percent2),
+  percentage = as.numeric(celltype_percent2),
+  section = "Section_2"
+)
+
+df1$section <- label1
+df2$section <- label2
+
+df_all <- rbind(df1, df2)
+
+
+ggplot(df_all, aes(x = section, y = percentage, fill = cell_type)) +
+  geom_bar(stat = "identity") +
+  ylab("Percentage (%)") +
+  xlab("") +
+  theme_minimal()
+```
+
+
+```{r}
+# refining plots
+
+library(RColorBrewer)
+
+# Make a named vector of colors
+celltype_colors <- brewer.pal(n = 9, name = "Set1")  # 9 colors for 9 cell types
+names(celltype_colors) <- names(celltype_percent)    # assign colors to cell types
+
+pdf <- "/my_path/Patient4_cell_proportions.pdf"
+pdf(file = pdf, width = 10, height = 15)
+
+p <- ggplot(df_all, aes(x = section, y = percentage, fill = cell_type)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = round(percentage, 1)), position = position_stack(vjust = 0.5), size = 3, color = "black") +
+  scale_fill_manual(values = celltype_colors) +
+  ylab("Percentage (%)") +
+  xlab("") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p)
+dev.off
+
+png_res <- 1200
+png(filename = "/my_path/Patient4_cell_proportions.png", width = 7*png_res, height = 12*png_res, res = png_res);print(p);dev.off()
+```
+
+#Continue with Patient 3
+
+```{r}
+#selecting one sample
+spots <- rownames(deconv@meta.data[deconv$sample_id== "clinical_id_3_standard", ])
+# Get the unique patient_method for this section
+label1 <- unique(deconv@meta.data[spots, "patient_method"])
+label1
+mat_section <- mat[, spots]
+head(mat_section)
+
+#sum of cell type proportion per spot (should equal 1)
+colSums(mat_section)[1:5]
+#sum of cell type proportion per cell type across all spots
+rowSums(mat_section)[1:5]
+mat_section_Sums <- rowSums(mat_section)
+#total contribution across all cell types and spots
+sum(rowSums(mat_section))
+
+# Convert your cell-type sums to percentages
+
+celltype_percent <- (mat_section_Sums / sum(mat_section_Sums)) * 100
+celltype_percent
+round(celltype_percent, 2)
+
+#data frame
+df3 <- data.frame(
+  cell_type = names(celltype_percent),
+  percentage = as.numeric(celltype_percent)
+)
+
+#stacked barplot
+ggplot(df3, aes(x = "Section", y = percentage, fill = cell_type)) +
+  geom_bar(stat = "identity") +
+  ylab("Percentage (%)") +
+  xlab("") +
+  theme_minimal()
+```
+
+```{r}
+#selecting one sample
+spots <- rownames(deconv@meta.data[deconv$sample_id== "clinical_id_3_STAY", ])
+# Get the unique patient_method for this section
+label2 <- unique(deconv@meta.data[spots, "patient_method"])
+label2
+mat_section <- mat[, spots]
+head(mat_section)
+
+#sum of cell type proportion per spot (should equal 1)
+colSums(mat_section)[1:5]
+#sum of cell type proportion per cell type across all spots
+rowSums(mat_section)[1:5]
+mat_section_Sums <- rowSums(mat_section)
+#total contribution across all cell types and spots
+sum(rowSums(mat_section))
+
+# Convert your cell-type sums to percentages
+
+celltype_percent <- (mat_section_Sums / sum(mat_section_Sums)) * 100
+celltype_percent
+round(celltype_percent, 2)
+
+#data frame
+df4 <- data.frame(
+  cell_type = names(celltype_percent),
+  percentage = as.numeric(celltype_percent)
+)
+
+#stacked barplot
+ggplot(df4, aes(x = "Section", y = percentage, fill = cell_type)) +
+  geom_bar(stat = "identity") +
+  ylab("Percentage (%)") +
+  xlab("") +
+  theme_minimal()
+```
+
+```{r}
+#pairwise comparison
+
+df3$section <- label1
+df4$section <- label2
+
+df_all <- rbind(df3, df4)
+
+# refining plots
+
+library(RColorBrewer)
+
+# Make a named vector of colors
+celltype_colors <- brewer.pal(n = 9, name = "Set1")  # 9 colors for 9 cell types
+names(celltype_colors) <- names(celltype_percent)    # assign colors to cell types
+
+pdf <- "/my_path/Patient3_cell_proportions.pdf"
+pdf(file = pdf, width = 10, height = 15)
+
+p <- ggplot(df_all, aes(x = section, y = percentage, fill = cell_type)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = round(percentage, 1)), position = position_stack(vjust = 0.5), size = 3, color = "black") +
+  scale_fill_manual(values = celltype_colors) +
+  ylab("Percentage (%)") +
+  xlab("") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p)
+dev.off
+
+png_res <- 1200
+png(filename = "/my_path/Patient3_cell_proportions.png", width = 7*png_res, height = 12*png_res, res = png_res);print(p);dev.off()
+```
+
+

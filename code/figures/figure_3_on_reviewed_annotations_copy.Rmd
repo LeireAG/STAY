@@ -19,9 +19,11 @@ Load normalized Seurat object
 ```{r}
 # Load data (new Seurat object modified by Sophie) with my added annotations
 vis_mod_norm <- readRDS(file = paste0("/my_path/", "vis_mod_norm.rds"))
+# Normalization applies to gene expression values, not to the count of detected genes
 ```
 
-#Figure 3) A-H. Spatial plots of normalized unique genes per spot
+
+#Figure 3) A-H. Spatial distribution of detected genes per spot
 ```{r width = 8, height = 6}
 #use magma color and no background images to reflect data loss due to tissue detachment. 
 
@@ -45,7 +47,7 @@ p_small <- MapFeatures(vis_mod_norm,
 print(p_small)
 dev.off()
 png_res <- 1200
-png(filename = "/my_path/small_samples_plot_purple.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_small);dev.off()
+png(filename = "/my_path/unique_genes_per_spot_small_samples_plot_purple.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_small);dev.off()
 
 #Plot large area samples (11x11mm) with a smaller point size
 pdf(file = pdf_path_large, width = 8, height = 6)
@@ -65,6 +67,52 @@ png_res <- 1200
 png(filename = "/my_path/large_samples_plot_purple.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_large);dev.off()
 
 ```
+
+#Figure 3) A-H. Spatial distribution of UMI counts per spot
+```{r width = 8, height = 6}
+#use magma color and no background images to reflect data loss due to tissue detachment. 
+
+pdf_path_small <- "/my_path/small_samples_purple_plot_UMI.pdf"
+pdf_path_large <- "/my_path/large_samples_purple_plot_UMI.pdf"
+
+
+# Plot small capture area samples (6.5x6.5mm) with a larger point size
+pdf(file = pdf_path_small, width = 8, height = 6)
+
+p_small <- MapFeatures(vis_mod_norm,
+                       features = "nCount_Spatial",
+                       colors = viridis::magma(n = 11, direction = -1),
+                       slot = "counts",
+                       override_plot_dims = FALSE,
+                       #image_use = "raw",
+                       pt_size = 0.5,  # Larger spot size for small capture areas
+                       add_scalebar = T, scalebar_position = c(1,1),
+                       pt_stroke = NA, # No stroke around spots
+                       ncol = 4)
+print(p_small)
+dev.off()
+png_res <- 1200
+png(filename = "/my_path/UMI_counts_per_spot_small_samples_plot_purple.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_small);dev.off()
+
+#Plot large area samples (11x11mm) with a smaller point size
+pdf(file = pdf_path_large, width = 8, height = 6)
+p_large <- MapFeatures(vis_mod_norm,
+                       features = "nCount_Spatial",
+                       colors = viridis::magma(n = 11, direction = -1),, 
+                       slot = "counts",
+                       override_plot_dims = TRUE,
+                       #image_use = "raw",
+                       pt_size = 0.3,  # Smaller spot size for large capture areas
+                       pt_stroke = NA, # No stroke around spots
+                       ncol = 4, 
+                       add_scalebar = T, scalebar_position = c(1,1))
+dev.off()
+
+png_res <- 1200
+png(filename = "/my_path/UMI_counts_per_spot_large_samples_plot_purple.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_large);dev.off()
+
+```
+
 
 ```{r}
 # Load data (new Seurat object modified by Sophie) with my added annotations
@@ -112,7 +160,8 @@ png(filename = "my_path/spots_by_method.png", width = 10*png_res, height = 8*png
 Violin plot of unique genes generates Figure 3I
 ```{r, fig.width = 10, fig.height = 8}
 unique_genesVplot <- VlnPlot(
-  vis_mod_anno,
+  #vis_mod_anno,
+  vis_mod_norm,
   group.by = "patient",
   split.by = "method",
   features = "nFeature_Spatial",
@@ -133,8 +182,39 @@ unique_genesVplot <- unique_genesVplot + geom_boxplot(
   color = "black",
   linewidth = 0.3
 )
-
+print(unique_genesVplot)
 png_res <- 1200
 png(filename = "/my_path/unique_genes_by_method.png", width = 10*png_res, height = 8*png_res, res = png_res);print(unique_genesVplot);dev.off()
-
 ```
+
+Violin plot of unique UMI generates Figure 3I
+```{r}
+unique_UMIsVplot <- VlnPlot(
+  #vis_mod_anno,
+  vis_mod_norm,
+  group.by = "patient",
+  split.by = "method",
+  features = "nCount_Spatial",
+  pt.size = 0.1, 
+  add = TRUE, 
+  slot = "counts") +  
+  scale_fill_manual(values = c("STAY" = "#FBB4AE",  # pastel red
+                             "standard" = "#B3CDE3")) + # pastel blue 
+  theme_minimal()
+# This removes original points and adds new ones in grey
+unique_UMIsVplot$layers[[2]] <- NULL  # remove original jittered points
+
+unique_UMIsVplot <- unique_UMIsVplot + geom_boxplot(
+  width = 0.1,
+  outlier.shape = NA,
+  position = position_dodge(width = 0.9),
+  alpha = 0.7,
+  color = "black",
+  linewidth = 0.3
+) #+
+  #scale_y_continuous(limits = c(0, 20000)) # limits visible y-axis range and trims violin plots to fit
+print(unique_UMIsVplot)
+png_res <- 1200
+png(filename = "/my_path/UMIs_by_method.png", width = 10*png_res, height = 8*png_res, res = png_res);print(unique_UMIsVplot);dev.off()
+```
+
