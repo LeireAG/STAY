@@ -23,7 +23,7 @@ Contains the code to generate the UMAP in Figure 3F.
 - figure_4/ - generates a normalized with corrected number of spots Seurat object including nmf and deconvolution vis_mod_nmf_decon.rds
 * figure_4_copy.Rmd contains the code to run Non-Negative_matrix Factorization and saving that Seurat object. Generates fig. 4 A, B, D1-I1 and D2-I2. Used for ploting factors spatially for supplementary figs 3-12. 
 * semla_deconvolution.rmd contains the code to run the NNLS deconvolution method included in the Semla package on the previous object containing NMF factors
-* cell_proportion_barplot_figure_4K.Rmd contain the code to generate stacked barplots of cell-type proportions for Patients 3 and 4.  
+* cell_proportion_barplot_figure_4K.Rmd contains the code to generate stacked barplots of cell-type proportions for Patients 3 and 4.  
 - figure_3_on_reviewed_annotations_copy.Rmd generates spatial plots of normalized unique genes per spot (figure 3 A-H), spot number barplots in Figure 1 G1-4 and violin plots in Figure 3 I. 
 - scatter_plots_figure_3E.Rmd contains the code to generate correlation plots for all patients
 
