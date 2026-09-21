@@ -33,8 +33,8 @@ from scipy.stats import mannwhitneyu
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_detachment_pipeline import MATRIX_NAME, SPACERANGER_DIR
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CFG = yaml.safe_load((PROJECT_ROOT / "config.yaml").read_text(encoding="utf-8"))
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+CFG = yaml.safe_load((PROJECT_ROOT / "resources" / "detachment.yaml").read_text(encoding="utf-8"))
 
 SAMPLE_LIST = PROJECT_ROOT / CFG["paths"]["sample_list"]
 SCORE_DIR = PROJECT_ROOT / CFG["paths"]["detachment_score"]
@@ -43,6 +43,18 @@ RESULTS_DIR = PROJECT_ROOT / CFG["paths"]["results"]
 COHORT_COLORS = CFG["colors"]["cohort"]
 COHORT_ORDER = ["standard", "STAY"]
 COHORT_LABELS = {"standard": "standard", "STAY": "STAY"}
+SCORE_THRES = float(CFG["scoring"]["score_thres"])
+SCORE_MAD_THRES = float(CFG["scoring"]["score_mad_thres"])
+MIN_SPOTS = int(CFG["scoring"]["min_spots"])
+
+BOXPLOT_STYLE = dict(
+    patch_artist=True,
+    showfliers=False,
+    medianprops={"color": "black", "linewidth": 1.0},
+    boxprops={"linewidth": 0.7},
+    whiskerprops={"linewidth": 0.7},
+    capprops={"linewidth": 0.7},
+)
 
 
 def apply_style() -> None:
@@ -65,30 +77,27 @@ def apply_style() -> None:
     )
 
 
+def detachment_threshold(values: pd.Series) -> float:
+    if not len(values):
+        return np.nan
+    median = float(values.median())
+    mad = float(np.median(np.abs(values - median))) * 1.4826
+    return max(SCORE_THRES, median + SCORE_MAD_THRES * mad)
+
+
 def assign_detached(scores: pd.Series) -> pd.Series:
-    score_thres = float(CFG["scoring"]["score_thres"])
-    mad_thres = float(CFG["scoring"]["score_mad_thres"])
-    min_spots = int(CFG["scoring"]["min_spots"])
     values = pd.to_numeric(scores, errors="coerce")
-    valid = values.dropna()
-    median = float(valid.median()) if len(valid) else np.nan
-    mad = float(np.median(np.abs(valid - median))) * 1.4826 if len(valid) else np.nan
-    threshold = max(score_thres, median + mad_thres * mad)
-    called = values >= threshold
-    if int(called.fillna(False).sum()) < min_spots:
+    threshold = detachment_threshold(values.dropna())
+    called = (values >= threshold).fillna(False)
+    if int(called.sum()) < MIN_SPOTS:
         return pd.Series(False, index=scores.index)
-    return called.fillna(False)
+    return called
 
 
 def call_rate(scores: pd.Series) -> tuple[float, float, int]:
     values = pd.to_numeric(scores, errors="coerce").dropna()
-    called = assign_detached(scores)
-    n_high = int(called.sum())
-    score_thres = float(CFG["scoring"]["score_thres"])
-    mad_thres = float(CFG["scoring"]["score_mad_thres"])
-    median = float(values.median()) if len(values) else np.nan
-    mad = float(np.median(np.abs(values - median))) * 1.4826 if len(values) else np.nan
-    threshold = max(score_thres, median + mad_thres * mad)
+    n_high = int(assign_detached(scores).sum())
+    threshold = detachment_threshold(values)
     return 100.0 * n_high / len(values), threshold, n_high
 
 
@@ -179,18 +188,21 @@ def read_spot_metrics(sample_id: str, barcodes: pd.Series) -> pd.DataFrame:
     return df.loc[df["barcode"].isin(barcodes_str)].copy()
 
 
-def load_sample_summaries() -> pd.DataFrame:
+def load_summaries() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Per-sample and per-(sample, compartment) detachment/QC summaries."""
     samples = pd.read_csv(SAMPLE_LIST)
-    rows = []
+    sample_rows = []
+    comp_rows = []
     for _, row in samples.iterrows():
         sample_id = str(row["sample_id"])
         cohort = str(row["cohort"])
         scores = pd.read_csv(SCORE_DIR / f"{sample_id}.csv")
         scores["barcode"] = scores["barcode"].astype(str)
         scores["detachment_score"] = pd.to_numeric(scores["detachment_score"], errors="coerce")
+        scores["detached"] = assign_detached(scores["detachment_score"])
         rate, threshold, n_high = call_rate(scores["detachment_score"])
         metrics = read_spot_metrics(sample_id, scores["barcode"])
-        rows.append(
+        sample_rows.append(
             {
                 "sample_id": sample_id,
                 "cohort": cohort,
@@ -203,18 +215,6 @@ def load_sample_summaries() -> pd.DataFrame:
                 "median_pct_mt": float(metrics["pct_mt"].median()),
             }
         )
-    return pd.DataFrame(rows)
-
-
-def load_compartment_summaries() -> pd.DataFrame:
-    samples = pd.read_csv(SAMPLE_LIST)
-    rows = []
-    for _, row in samples.iterrows():
-        sample_id = str(row["sample_id"])
-        cohort = str(row["cohort"])
-        scores = pd.read_csv(SCORE_DIR / f"{sample_id}.csv")
-        scores["barcode"] = scores["barcode"].astype(str)
-        scores["detached"] = assign_detached(scores["detachment_score"])
 
         epi_path = EPITHELIAL_DIR / sample_id / "csv" / f"{sample_id}_epithelial.csv"
         if epi_path.exists():
@@ -227,7 +227,7 @@ def load_compartment_summaries() -> pd.DataFrame:
         merged = scores[["barcode", "detached"]].merge(epi, on="barcode", how="left")
         merged["compartment"] = np.where(merged["annotation"].notna(), "epithelial", "non-epithelial")
         for comp, sub in merged.groupby("compartment", sort=False):
-            rows.append(
+            comp_rows.append(
                 {
                     "sample_id": sample_id,
                     "cohort": cohort,
@@ -237,7 +237,7 @@ def load_compartment_summaries() -> pd.DataFrame:
                     "detachment_rate_pct": 100.0 * float(sub["detached"].sum()) / len(sub),
                 }
             )
-    return pd.DataFrame(rows)
+    return pd.DataFrame(sample_rows), pd.DataFrame(comp_rows)
 
 
 def describe_stats(values: pd.Series) -> dict:
@@ -296,17 +296,7 @@ def plot_cohort_panel(
     rng = np.random.default_rng(0)
     positions = [0.0, 1.0]
     data = [summaries.loc[summaries["cohort"] == c, metric].dropna().to_numpy() for c in COHORT_ORDER]
-    bp = ax.boxplot(
-        data,
-        positions=positions,
-        widths=0.42,
-        patch_artist=True,
-        showfliers=False,
-        medianprops={"color": "black", "linewidth": 1.0},
-        boxprops={"linewidth": 0.7},
-        whiskerprops={"linewidth": 0.7},
-        capprops={"linewidth": 0.7},
-    )
+    bp = ax.boxplot(data, positions=positions, widths=0.42, **BOXPLOT_STYLE)
     for patch, cohort in zip(bp["boxes"], COHORT_ORDER):
         patch.set_facecolor(COHORT_COLORS[cohort])
         patch.set_edgecolor("black")
@@ -350,17 +340,7 @@ def plot_compartment_panel(ax: plt.Axes, comp_df: pd.DataFrame) -> pd.DataFrame:
             if len(pts) == 0:
                 continue
             pos = x_center + offsets[cohort]
-            bp = ax.boxplot(
-                [pts],
-                positions=[pos],
-                widths=0.38,
-                patch_artist=True,
-                showfliers=False,
-                medianprops={"color": "black", "linewidth": 1.0},
-                boxprops={"linewidth": 0.7},
-                whiskerprops={"linewidth": 0.7},
-                capprops={"linewidth": 0.7},
-            )
+            bp = ax.boxplot([pts], positions=[pos], widths=0.38, **BOXPLOT_STYLE)
             for patch in bp["boxes"]:
                 patch.set_facecolor(COHORT_COLORS[cohort])
                 patch.set_edgecolor("black")
@@ -391,8 +371,7 @@ def main() -> None:
     apply_style()
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    summaries = load_sample_summaries()
-    comp_df = load_compartment_summaries()
+    summaries, comp_df = load_summaries()
 
     epi = comp_df.loc[comp_df["compartment"] == "epithelial"].set_index("sample_id")
     epi = epi[["n_spots", "n_detached", "detachment_rate_pct"]].add_prefix("epithelial_")
@@ -405,7 +384,7 @@ def main() -> None:
     fig = plt.figure(figsize=(8.6, 6.0))
     gs = GridSpec(
         2,
-        4,
+        8,
         figure=fig,
         height_ratios=[1.45, 1.0],
         hspace=0.58,
@@ -416,11 +395,13 @@ def main() -> None:
         right=0.99,
     )
 
-    ax_rate = fig.add_subplot(gs[0, 0])
-    ax_genes = fig.add_subplot(gs[0, 1])
-    ax_umi = fig.add_subplot(gs[0, 2])
-    ax_mt = fig.add_subplot(gs[0, 3])
-    ax_comp = fig.add_subplot(gs[1, 0:2])
+    ax_rate = fig.add_subplot(gs[0, 0:2])
+    ax_genes = fig.add_subplot(gs[0, 2:4])
+    ax_umi = fig.add_subplot(gs[0, 4:6])
+    ax_mt = fig.add_subplot(gs[0, 6:8])
+    ax_comp = fig.add_subplot(gs[1, 0:3])
+    comp_pos = ax_comp.get_position()
+    ax_comp.set_position([comp_pos.x0, comp_pos.y0, comp_pos.width * 0.7, comp_pos.height])
 
     plot_cohort_panel(
         ax_rate,

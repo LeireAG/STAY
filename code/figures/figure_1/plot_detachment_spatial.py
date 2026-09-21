@@ -30,8 +30,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from plot_detachment_cohort import assign_detached
 from run_detachment_pipeline import MATRIX_NAME, SPACERANGER_DIR, read_cytassist_coords, read_image, read_spots
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CFG = yaml.safe_load((PROJECT_ROOT / "config.yaml").read_text(encoding="utf-8"))
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+CFG = yaml.safe_load((PROJECT_ROOT / "resources" / "detachment.yaml").read_text(encoding="utf-8"))
 
 SAMPLE_LIST = PROJECT_ROOT / CFG["paths"]["sample_list"]
 SCORE_DIR = PROJECT_ROOT / CFG["paths"]["detachment_score"]

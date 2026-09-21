@@ -1,0 +1,23 @@
+paths:
+  sample_list: resources/sample_list.csv
+  spaceranger: data/spaceranger/experiments
+  raw: data/raw
+  detachment_score: data/detachment_score
+  epithelial_annotation: data/epithelial_annotation
+  results: results/figure_1
+
+scoring:
+  matrix: raw
+  patch_size_cytassist: 40
+  patch_size_hires: 40
+  empty_tissue_expr: dr_hires_ASM > 0.9
+  detachment_score_expr: >-
+    delta_g * ((dr_cyt_r * dr_cyt_g * dr_cyt_b) / (256 ** 3))
+  score_thres: 25
+  score_mad_thres: 2
+  min_spots: 20
+
+colors:
+  cohort:
+    STAY: "#FBB4AE"
+    standard: "#B3CDE3"

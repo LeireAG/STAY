@@ -1,0 +1,16 @@
+name: detachment-score
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - pyyaml
+  - h5py
+  - py-opencv
+  - matplotlib-base
+  - scipy
+  - scanpy
+  - anndata
+  - scikit-image

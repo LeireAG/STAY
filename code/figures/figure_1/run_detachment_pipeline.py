@@ -21,8 +21,8 @@ from skimage.feature import graycomatrix, graycoprops
 
 cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CFG = yaml.safe_load((PROJECT_ROOT / "config.yaml").read_text(encoding="utf-8"))
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+CFG = yaml.safe_load((PROJECT_ROOT / "resources" / "detachment.yaml").read_text(encoding="utf-8"))
 
 SAMPLE_LIST = PROJECT_ROOT / CFG["paths"]["sample_list"]
 SPACERANGER_DIR = PROJECT_ROOT / CFG["paths"]["spaceranger"]
