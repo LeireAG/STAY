@@ -1,5 +1,5 @@
 ---
-title: "figure_4"
+title: "figure_7"
 Aim: investigating areas of detachment by Non-Negative Matrix factorization and deconvolution with the NNLS method
 in Figure 4 to reflect the cancer biology in the paper 
 I am displaying deconvolution results and NMF
@@ -68,7 +68,7 @@ p <- PlotFeatureLoadings(deconv,
 p
 
 png_res <- 1200
-png(filename = "/Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/figures/2nd_draft/Figure_5/new_corrected_object/nmf/vis_mod_NMF_feature_loading.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p);dev.off()
+png(filename = "/my_path/vis_mod_NMF_feature_loading.png", width = 14*png_res, height = 25*png_res, res = png_res);print(p);dev.off()
 
 #Generates Figure 4 B
 p_10_11_21 <- PlotFeatureLoadings(deconv, 
@@ -123,7 +123,7 @@ ggsave(paste0("/my_path/", "/gene_loadings_heatmap_NMF13_24", ".pdf"), plot = p3
 
 ```
 
-Visualization of factors spatially for Supplementary figures 3 to 10
+Visualization of factors spatially for Supplementary figures 4 to 11
 
 ```{r plot_NMF, fig.width=14, fig.height=25}
 pdf_clinical_id_1_STAY <- "/my_path/pdf_clinical_id_1_STAY.pdf"
@@ -259,7 +259,7 @@ print(p8)
 ```
 
 
-### plot celltypes over factors figure 4 A. 
+### plot celltypes over factors figure 7 A. 
 ```{r}
 DefaultAssay(deconv) <- "garvan_major_map"
 # Calculate Spearman correlation between NMF factors and cell types
@@ -280,7 +280,7 @@ pdf("/my_path/nmf_major_celltype_correlation.pdf", width = 10, height = 10)
 dev.off()
 ```
 
-Starting plotting for figure 4 D1-I1 and D2-I2
+Starting plotting for figure 7 D1-I1 and D2-I2
 patient 4 - STAY
 
 ```{r width = 8, height = 6}
