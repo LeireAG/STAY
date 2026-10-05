@@ -1,0 +1,702 @@
+---
+title: "lymph_node_analysis"
+format: html
+editor: visual
+---
+
+## Load libraries
+
+```{r}
+#library(hdf5r)
+#library(Seurat)
+library(semla)
+library(ggplot2)
+```
+
+## Create semla object
+
+```{r}
+#create spatial object for all samples
+#define root directory
+visium_dir <- "/my_path/"
+#Get the slide IDs
+slide_directories <- list.dirs( path = visium_dir, full.names = TRUE, recursive = FALSE ) slide_id_list <- basename(slide_directories)
+
+#Get the required files
+samples <- file.path( slide_directories, "output_data", slide_id_list, "outs", "filtered_feature_bc_matrix.h5" ) 
+imgs <- file.path( slide_directories, "output_data", slide_id_list, "outs", "spatial", "tissue_hires_image.png" ) 
+spotfiles <- file.path( slide_directories, "output_data", slide_id_list, "outs", "spatial", "tissue_positions.csv" ) 
+json <- file.path( slide_directories, "output_data", slide_id_list, "outs", "spatial", "scalefactors_json.json" )
+
+#Check that all samples exist
+file_check <- data.frame( sample_id = slide_id_list, samples = file.exists(samples), imgs = file.exists(imgs), spotfiles = file.exists(spotfiles), json = file.exists(json), stringsAsFactors = FALSE ) 
+print(file_check)
+
+#create infoTable
+infoTable <- data.frame(
+  samples = samples,
+  imgs = imgs,
+  spotfiles = spotfiles,
+  json = json,
+  sample_id = sample_id_list,
+  stringsAsFactors = FALSE
+)
+
+print(infoTable)
+ 
+#create semla object
+se <- ReadVisiumData(infoTable)
+
+```
+
+## QC
+
+```{r}
+se <- LoadImages(se, image_height = 600) #downscale the image
+ImagePlot(se)
+
+# Plot with semla
+MapFeatures(se, features = "nFeature_Spatial", 
+            image_use = "raw", override_plot_dims = TRUE) & ThemeLegendRight()
+
+#Save the object
+
+out_dir <- "/my_path/rds_objects/"
+filename <- "lymph_nodes.rds"
+
+saveRDS(se, file.path(out_dir, filename))
+
+```
+
+### QC measurements
+
+```{r, fig.height=8, fig.width=10}
+# Derived from raw counts
+pdf_path_gene <- "/my_path/Spatial_plot_genes.pdf"
+
+pdf(file = pdf_path_gene, width = 10, height = 8)
+gene_plot <- MapFeatures(se, 
+                         features = "nFeature_Spatial", 
+                         colors = viridis::magma(n = 11, direction = -1),
+                         #image_use = "raw", 
+                         override_plot_dims = TRUE,
+                         pt_size = 0.3,
+                         pt_stroke = NA, 
+                         ncol = 5) #& ThemeLegendRight()
+print(gene_plot)
+dev.off
+
+
+pdf_path_UMI <-  "/my_path/Spatial_plot_UMIs.pdf"
+pdf(file = pdf_path_UMI, width = 10, height = 8)
+UMI_plot <- MapFeatures(se, 
+                        features = "nCount_Spatial",
+                        colors = viridis::magma(n = 11, direction = -1),
+                         #image_use = "raw", 
+                         override_plot_dims = TRUE,
+                         pt_size = 0.3,
+                         pt_stroke = NA, 
+                         ncol = 5) #& ThemeLegendRight()
+            
+print(UMI_plot)
+dev.off
+
+Vplot_genes <- VlnPlot(
+  se,
+  group.by = "sample_id",
+  features = "nFeature_Spatial",
+  #cols = "#FBB4AE"
+)
+
+Vplot_genes
+
+Vplot_genes$layers[[2]] <- NULL # Remove original jittered points
+
+Vplot_genes <- Vplot_genes + geom_boxplot(
+  width = 0.1,
+  outlier.shape = NA,
+  position = position_dodge(width = 0.9),
+  alpha = 0.7,
+  color = "black",
+  linewidth = 0.3, 
+)
+
+print(Vplot_genes)
+png_res <- 1200
+png(filename = "/my_path/unique_genes_Violin.png", width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_genes);dev.off()
+
+
+Vplot_UMI <- VlnPlot(
+  se,
+  group.by = "sample_id",
+  features = "nCount_Spatial",
+  #cols = "#FBB4AE"
+)
+
+Vplot_UMI
+
+Vplot_UMI$layers[[2]] <- NULL # Remove original jittered points
+
+Vplot_UMI <- Vplot_UMI + geom_boxplot(
+  width = 0.1,
+  outlier.shape = NA,
+  position = position_dodge(width = 0.9),
+  alpha = 0.7,
+  color = "black",
+  linewidth = 0.3, 
+)
+
+print(Vplot_UMI)
+png_res <- 1200
+png(filename = "/my_path/unique_counts_Violin.png", width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_UMI);dev.off()
+```
+
+### Data preprocessing
+
+### 1. Create a Seurat object
+
+```{r}
+# Load data semla object
+se <- readRDS(file = paste0("/my_path/rds_objects/", "lymph_nodes.rds"))
+```
+
+```{r}
+#This coerces the Spatial assay into a classic Seurat RNA assay, and stores it as "RNA3" in your object. To use Seurat functions
+names(se@assays)
+se[["RNA3"]] <- as(object = se[["Spatial"]], Class = "Assay")
+
+names(se@assays) # check that an additional assay called "RNA3" is created
+```
+
+### 2. QC metrics
+
+```{r}
+# Mitochondrial
+mt.genes <- grep(pattern = "^MT-", x = rownames(se), value = TRUE)
+se$percent.mito <- (Matrix::colSums(se@assays$RNA@counts[mt.genes,])/Matrix::colSums(se@assays$RNA@counts))*100
+head(se$percent.mito) # There is only 1 to 5% of mitochrondial genes cause these are not included in the 10x gen pannel.
+
+# Ribosomal
+# Collect all genes coding for ribosomal proteins
+rp.genes <- grep(pattern = "^RP[SL]", x = rownames(se), value = TRUE)
+se$percent.ribo <- (Matrix::colSums(se@assays$RNA@counts[rp.genes,])/Matrix::colSums(se@assays$RNA@counts))*100
+head(se$percent.ribo)  # There is no ribosomal genes cause these are not included in the 10x gen pannel.
+
+# Percentage hemoglobin genes - includes all genes starting with HB except HBP.
+#Collect hemoglobin protein coding genes
+hemo.genes <- grep(pattern = "^HB[^(P|E|S)]", x = rownames(se), value = TRUE)
+se$percent.hemo <- (Matrix::colSums(se@assays$RNA@counts[hemo.genes,])/Matrix::colSums(se@assays$RNA@counts))*100
+head(se$percent.hemo) # The percentage of hemo genes is like 0%
+
+# Percentage for some platelet markers
+plat.genes <- grep(pattern = "PECAM1|PF4", x = rownames(se), value = TRUE)
+se$percent.plat <- (Matrix::colSums(se@assays$RNA@counts[plat.genes,])/Matrix::colSums(se@assays$RNA@counts))*100
+head(se$percent.plat) #The percentage is almost 0
+```
+
+```{r, fig.width = 15, fig.height = 8}
+#Plot as Violin
+feats <- c("nFeature_Spatial", "nCount_Spatial")
+QC_all_samples <- VlnPlot(se, group.by = "sample_id", features = feats, pt.size = 0.1, ncol = 2)
+QC_all_samples
+```
+
+```{r, fig.width = 15, fig.height = 8}
+#Plot spatially to understand ViolinPlots
+m <- MapFeatures(se, features = "percent.mito", cols = c("lightgray", "mistyrose", "red", "dark red", "black"), pt.size = 0.1, ncol = 4) #something is happening with the pt.size
+m
+g <- MapFeatures(se, features = "percent.mito", cols = c("lightgray", "mistyrose", "red", "dark red", "black"), pt.size = 0.1, ncol = 4) #something is happening with the pt.size
+m
+
+g <- MapFeaturesSummary(se, 
+                        features = "nFeature_Spatial", 
+                        subplot_type = "violin",
+                        colors = viridis::rocket(11, direction = -1))
+g
+
+c <- MapFeaturesSummary(se, 
+                        features = "nCount_Spatial", 
+                        subplot_type = "violin",
+                        ncol = 4,
+                        colors = viridis::rocket(11, direction = -1))
+c
+
+#Plotting spatially nCounts and nFeatures gave more insight. Unfortunately, there are two samples that seem to have some artifact. Not sure yet if it's in the sample nature (e.g. necrosis) or an issue in the lab. I just asked for pathology annotations. I'm not gonna remove spots for now. But I think I could with the FeatureViewer tool? Although I am using Posit and visualization does not work great.
+
+#Looking at distribution of UMIs per sample
+summary(se@meta.data$nCount_Spatial)
+#per slide
+by(
+  se@meta.data$nCount_Spatial,
+  se@meta.data$sample_id,
+  summary
+)
+
+Layers(se[["Spatial"]])
+#[1] "counts" -> raw UMI counts
+```
+
+### 3. Filter low-quality cells
+
+```{r, fig.width = 15, fig.height = 8}
+#e.g. spots with too few or too many detected genes, outliers in UMI count distributions
+#Histograms to investigate filtering
+
+# UMI counts
+UMI_freq <- ggplot(se@meta.data, aes(x = nCount_Spatial)) +
+  geom_histogram(bins = 100) +
+  theme_classic() +
+  labs(
+    x = "nCount_Spatial",
+    y = "Frequency"
+  )
+
+UMI_freq
+
+# Number of detected features
+gene_freq <- ggplot(se@meta.data, aes(x = nFeature_Spatial)) +
+  geom_histogram(bins = 100) +
+  theme_classic() +
+  labs(
+    x = "nFeature_Spatial",
+    y = "Frequency"
+  )
+
+gene_freq
+
+# Frequency of spots at each mitochondrial percentage
+mito_freq <- ggplot(se@meta.data, aes(x = percent.mito)) +
+  geom_histogram(bins = 100) +
+  theme_classic() +
+  labs(
+    x = "Percent mitochondrial",
+    y = "Frequency"
+  )
+
+mito_freq
+
+# Relationship between mitochondrial percentage and UMI count for each individual spot. Every dot is one spot
+UMI_mito <- plot(
+  se@meta.data$percent.mito,
+  se@meta.data$nCount_Spatial,
+  pch = 16,
+  cex = 0.4,
+  xlab = "Percent mitochondrial",
+  ylab = "UMI count"
+)
+
+abline(v = 16, lty = 2)
+
+UMI_mito
+
+# Understand number of spots per patient with mito % > 16
+table(
+    se@meta.data$sample_id,
+    se@meta.data$percent.mito > 16
+)
+# I'd remove 246 spots, mostly affecting V53M20-113_A1 and, to a lesser extent, B1.
+# Spots with low counts and mito > 16
+summary(
+    se@meta.data$nCount_Spatial[
+        se@meta.data$percent.mito > 16
+    ]
+)
+
+#high mitochondrial percentage ↔ low UMI counts ↔ spatially localized suspicious region.
+se_filtered <- SubsetSTData(
+  se,
+  expression = percent.mito <= 16
+)
+
+ncol(se)
+ncol(se_filtered)
+#The filtering removed 226 spots with high mito content; low total counts and 16 NA values; 0 mito counts, 0 total counts. 242 spots removed. 
+
+sum(is.na(se_filtered$percent.mito))
+# No NA spots left
+
+d <- MapFeaturesSummary(se_filtered, features = "nCount_Spatial", subplot_type = "histogram", ncol = 4)
+
+d
+
+m_filtered <- MapFeatures(se_filtered, features = "percent.mito", cols = c("lightgray", "mistyrose", "red", "dark red", "black"), pt.size = 0.1, ncol = 4) #something is happening with the pt.size
+m_filtered
+
+#Save the filtered object
+
+out_dir <- "/my_path/rds_objects/"
+filename <- "lymph_nodes_filtered.rds"
+
+saveRDS(se_filtered, file.path(out_dir, filename))
+
+# Save plots as PNG 
+
+png_res <- 1200
+png(filename = "/my_path/percent_mito.png", width = 15*png_res, height = 8*png_res, res = png_res);print(m);dev.off()
+
+png(filename = "/my_path/percent_mito_filtered.png", width = 15*png_res, height = 8*png_res, res = png_res);print(m_filtered);dev.off()
+
+png(filename = "/my_path/total_counts.png", width = 15*png_res, height = 8*png_res, res = png_res);print(c);dev.off()
+
+png(filename = "/my_path/total_counts_filtrered.png", width = 15*png_res, height = 8*png_res, res = png_res);print(d);dev.off()
+
+```
+
+### 4. Normalize the data
+
+```{r}
+#load the filtered object!!
+se <- readRDS(file = paste0("/my_path/", "lymph_nodes_filtered.rds"))
+
+ncol(se)
+
+se <- NormalizeData(se)
+#Conceptually, for each spot: normalized expression=log(gene counts/total counts in spot ×10,000+1). It transforms the expression measurements so that differences in total counts are accounted for when comparing expression.
+Layers(se[["Spatial"]])
+#[1] "counts" -> raw UMI counts
+#[2] "data" -> log-normalized expression
+```
+
+### 5. Dimensionality reduction
+
+```{r}
+# Find varibale genes: whose variability is unusually high relative to their average expression.These genes carry a lot of information about spot-to-spot variation 
+se <- FindVariableFeatures(
+  se,
+  assay = "Spatial"
+)
+
+VariableFeatures(se) |> head(20)
+# Genes representing distinct molecular programmes: germinal center, immunoglobulins, myeloid, vascular, etc
+
+se <- ScaleData(se)
+# This centers each selected gene around zero and scales it so that genes with different absolute expression magnitudes don't dominate PCA simply because they're numerically larger.
+
+# PCA now can focus in patterns of variation, rather than raw magnitude. Finds major axes of variation.
+
+Layers(se[["Spatial"]])
+#[1] "counts"     "data"       "scale.data"
+
+se <- RunPCA(se)
+
+ElbowPlot(se) # Where the curve starts to flatten one can decide the number of PCs for visualization. 
+
+# Visiualize PCA
+se <- RunUMAP(se, dims = 1:10) # Cause elbow at 10 PCs
+Reductions(se)
+
+DimPlot(se, 
+        reduction = "pca", # plotting first two axes produced by PCA
+        group.by = "sample_id") + ggplot2::ggtitle("PC1 vs PC2") # Variability per sample
+
+# UMAP generated from the original PCA
+p <- DimPlot(se, 
+        reduction = "umap", # plotting UMAP embeddings 10 PCs in my case
+        group.by = "sample_id") + ggplot2::ggtitle("UMAP on PCA before harmony") 
+p
+# Variability per sample
+
+png(filename = "/my_path/UMAP_before_harmony.png", width = 10*png_res, height = 7*png_res, res = png_res);print(p);dev.off()
+```
+
+### 6. Batch effect correction
+
+```{r, fig.height=10, fig.width=7}
+library(harmony)
+
+# Harmony will create a new reduction rather than replacing your original PCA
+se <- RunHarmony(
+  se,
+  group.by.vars = "sample_id", #problem here you're potentially asking it to remove patient-to-patient biological variation, not just technical variation
+  reduction = "pca", 
+  reduction.save = "harmony" # Harmony stores its output as the "harmony" reduction. Then you run UMAP from that reduction.
+)
+
+se <- RunUMAP(
+  se,
+  reduction = "harmony",
+  dims = 1:10, 
+  reduction.name = "umap_harmony" # name I picked cause the UMAP is now based in harmony and not replacing the original PCA
+)
+
+# UMAP generated after harmony
+h <- DimPlot(
+  se,
+  reduction = "umap_harmony",
+  group.by = "sample_id"
+) +
+  ggplot2::ggtitle("UMAP on after harmony")
+h
+
+png(filename = "/my_path/UMAP_after_harmony.png", width = 10*png_res, height = 7*png_res, res = png_res);print(h);dev.off()
+
+# Let's look how most variable genes map so we are not removing patient-specific signal
+a <- FeaturePlot(
+  se,
+  reduction = "umap", # It is umap_pca before harmony
+  features = c(
+    "RGS13",
+    "IGLC1",
+    "JCHAIN",
+    "PPBP",
+    "S100A9",
+    "MYH11"
+  )
+)
+a
+png(filename = "/my_path/variable_genes_before_harmony.png", width = 8*png_res, height = 15*png_res, res = png_res);print(a);dev.off()
+
+
+b <- FeaturePlot(
+  se,
+  reduction = "umap_harmony",
+  features = c(
+    "RGS13",
+    "IGLC1",
+    "JCHAIN",
+    "PPBP",
+    "S100A9",
+    "MYH11"
+  )
+)
+b
+png(filename = "/my_path/variable_genes_after_harmony.png", width = 15*png_res, height = 8*png_res, res = png_res);print(b);dev.off()
+
+# Save final object
+out_dir <- "/my_path/"
+filename <- "lymph_nodes_final.rds"
+
+saveRDS(se, file.path(out_dir, filename))
+```
+
+### 7. Non-negative matrix factorization (NMF)
+
+```{r}
+# Load data final uncorrected (no Harmony) object
+
+library(singlet)
+
+set.seed(42)
+se_nmf <- RunNMF(se, assay = "RNA3") 
+```
+
+```{r}
+#### Check optimal number of factors k
+k <- ncol(se_nmf@reductions$nmf@feature.loadings)
+k
+
+#### Print factorization rank
+#pdf(paste0(plot.dir, "/RankPlot_nmf", ".pdf"), width = 25, height = 12)
+print(RankPlot(se_nmf))
+#dev.off()
+```
+
+```{r, fig.height=20, fig.width=28}
+# Spatial visualization
+MapFeatures(se_nmf, 
+            features = paste0("NMF_", 1:23), 
+            override_plot_dims = TRUE, 
+            colors = viridis::magma(n = 11, direction = -1)) &
+  theme(plot.title = element_blank())
+```
+
+```{r, height=28, fig.width=30}
+# Explore gene contributions
+NMF_dotplot <- PlotFeatureLoadings(se_nmf, 
+                    dims = 1:23, 
+                    reduction = "nmf", 
+                    nfeatures = 30,
+                    mode = "dotplot", 
+                    fill = "darkmagenta",
+                    pt_size = 3)
+NMF_dotplot
+
+# Heatmap
+NMF_heatmap <- PlotFeatureLoadings(se_nmf, 
+                    dims = 1:23, 
+                    reduction = "nmf", 
+                    nfeatures = 30, 
+                    mode = "heatmap", 
+                    gradient_colors = viridis::magma(n = 11, direction = -1))
+NMF_heatmap
+
+```
+
+```{r}
+# Functional enrichment analysis
+# fetch feature.loadings from DimReduc object
+nmf_loadings <- se_nmf[["nmf"]]@feature.loadings
+
+# Convert to long format and group data by factor
+gene_loadings_sorted <- nmf_loadings |> 
+  as.data.frame() |> 
+  tibble::rownames_to_column(var = "gene") |> 
+  as_tibble() |> 
+  tidyr::pivot_longer(all_of(colnames(nmf_loadings)), names_to = "fctr", values_to = "loading") |> 
+  mutate(fctr = factor(fctr, colnames(nmf_loadings))) |> 
+  group_by(fctr) |> 
+  arrange(fctr, -loading)
+
+# Extract top 10 genes per factor
+gene_loadings_sorted |> 
+  slice_head(n = 10)
+
+# Run functional enrichment analysis on top 10 genes from factor 1
+
+library(gprofiler2)
+
+# Get gene sets
+gene_set_nmf_6 <- gene_loadings_sorted |> 
+  filter(fctr == "NMF_6") |> 
+  slice_head(n = 10)
+
+# Run FEA
+fea_results_nmf_6 <- gost(query = gene_set_nmf_6$gene, ordered_query = TRUE, organism = "mmusculus", sources = "GO:BP")$result |> 
+  as_tibble()
+
+# Look at results
+fea_results_nmf_6 |> select(p_value, term_size, query_size, intersection_size, term_name)
+```
+
+```{r}
+# Save se_nmf object 
+out_dir <- "/my_path/"
+filename <- "lymph_nodes_nmf.rds"
+
+saveRDS(se_nmf, file.path(out_dir, filename))
+```
+
+#### Saving plots
+
+```{r}
+output_dir <- "/my_path/"
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+ggsave(
+  filename = file.path(output_dir, paste0("NMF_feature_loadings_dotplot.pdf")),
+  plot = NMF_dotplot,
+  width = 30,
+  height = 30,
+  units = "in"
+)
+
+ggsave(
+  filename = file.path(output_dir, "NMF_feature_loadings_heatmap.pdf"),
+  plot = NMF_heatmap,
+  width = 30,
+  height = 30,
+  units = "in"
+)
+
+# And for spatial plots
+# Extract sample_id from object
+sample_id_list <- unique(se_nmf$sample_id)
+
+for (i in seq_along(sample_id_list)) {
+
+  sample_id <- sample_id_list[i]
+
+  p <- MapFeatures(
+    se_nmf,
+    features = paste0("NMF_", 1:23),
+    section_number = i,
+    override_plot_dims = TRUE,
+    pt_stroke = 0,
+    pt_size = 1.5,
+    colors = viridis::magma(n = 11, direction = -1)
+  ) &
+    theme(plot.title = element_blank())
+
+  ggsave(
+    filename = file.path(
+      output_dir,
+      paste0("NMF_spatial_factors_", sample_id, ".pdf")
+    ),
+    plot = p,
+    width = 30,
+    height = 30,
+    units = "in"
+  )
+}
+```
+
+### Refining plots for figures
+
+```{r}
+# Violin plots genes and counts per spot
+Idents(se) <- "sample_id"
+
+Vplot_genes <- VlnPlot(
+  se,
+  idents = c(
+    "V53M13-062_A1",
+    "V53M13-062_B1",
+    "V53M20-113_A1",
+    "V53U05-031_A1"
+  ),
+  group.by = "sample_id",
+  features = "nFeature_Spatial", 
+  fill.by = "ident",
+  cols = c(
+    "#FDD0A2",  # pastel orange
+    "#C7E9C0",  # pastel green
+    "#B2DFDB",  # pastel turquoise
+    "#DADAEB"   # pastel purple
+  )
+)
+
+Vplot_genes
+
+Vplot_genes$layers[[2]] <- NULL # Remove original jittered points
+
+Vplot_genes <- Vplot_genes + geom_boxplot(
+  width = 0.1,
+  outlier.shape = NA,
+  position = position_dodge(width = 0.9),
+  alpha = 0.7,
+  color = "black",
+  linewidth = 0.3, 
+)
+
+print(Vplot_genes)
+png_res <- 1200
+png(filename = "/my_path/unique_genes_Violin_selected_samples.png", width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_genes);dev.off()
+
+
+Vplot_counts <- VlnPlot(
+  se,
+  idents = c(
+    "V53M13-062_A1",
+    "V53M13-062_B1",
+    "V53M20-113_A1",
+    "V53U05-031_A1"
+  ),
+  group.by = "sample_id",
+  features = "nCount_Spatial", 
+  fill.by = "ident",
+  cols = c(
+    "#FDD0A2",  # pastel orange
+    "#C7E9C0",  # pastel green
+    "#B2DFDB",  # pastel turquoise
+    "#DADAEB"   # pastel purple
+  )
+)
+
+Vplot_counts
+
+Vplot_counts$layers[[2]] <- NULL # Remove original jittered points
+
+Vplot_counts <- Vplot_counts + geom_boxplot(
+  width = 0.1,
+  outlier.shape = NA,
+  position = position_dodge(width = 0.9),
+  alpha = 0.7,
+  color = "black",
+  linewidth = 0.3, 
+)
+
+print(Vplot_counts)
+png_res <- 1200
+png(filename = "/my_path/unique_counts_Violin_selected_samples.png", width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_counts);dev.off()
+
+```
