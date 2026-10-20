@@ -249,8 +249,10 @@ if __name__ == "__main__":
     )
 
     parser.add_argument("--sample_id", help="Sample ID")
-    parser.add_argument("--res_dir", help="Results directory")
-    parser.add_argument("--input_dir", help="General path to input")
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    parser.add_argument("--cohort", help="Data cohort folder", choices=["paired", "lymph_node", "STAY", "standard"], default="paired")
+    parser.add_argument("--res_dir", help="Results directory (default: data/histopathology_annotation/<cohort>)")
+    parser.add_argument("--input_dir", help="General path to input", default=repo_root)
     parser.add_argument("--spaceranger_dir", help="Path to spaceranger outs (if not provided, will be determined from input_dir)")
     parser.add_argument("--qupath_dir", help="Path to qupath annotations (if not provided, will be determined from input_dir)")
     parser.add_argument("--consider_spot_diameter", help="Whether to consider the full size of the spot for label transfer, otherwise considers only the center coordinate (default: True)", 
@@ -264,10 +266,12 @@ if __name__ == "__main__":
     spaceranger_dir = args.spaceranger_dir
     qupath_dir = args.qupath_dir
     consider_spot_diameter = args.consider_spot_diameter
+    if res_dir is None:
+        res_dir = os.path.join(repo_root, 'data', 'histopathology_annotation', args.cohort)
 
     # Path to qupath file
     if qupath_dir is None:
-        qupath_dir = os.path.join(input_dir, sample_id, 'qupath_annotations')
+        qupath_dir = os.path.join(input_dir, 'data', 'histopathology_annotation', args.cohort, sample_id, 'geojson')
     else:
         # If not absolute, join with input_dir
         if not os.path.isabs(qupath_dir):
@@ -283,15 +287,14 @@ if __name__ == "__main__":
     print(f'Qupath annotations: {qupath_files}')
 
     if spaceranger_dir is None:
-        spaceranger_dir = os.path.join(input_dir, sample_id, 'spaceranger_outs', 'outs')
+        spaceranger_dir = os.path.join(input_dir, 'data', 'spaceranger', args.cohort, sample_id)
     else:
         # If not absolute, join with input_dir
         if not os.path.isabs(spaceranger_dir):
             spaceranger_dir = os.path.join(input_dir, spaceranger_dir)
-        # Only append sample_id/outs if not already present at the end
-        expected_suffix = os.path.join(sample_id, 'outs')
-        if not spaceranger_dir.rstrip(os.sep).endswith(expected_suffix):
-            spaceranger_dir = os.path.join(spaceranger_dir, sample_id, 'outs')
+        # Only append sample_id if not already present at the end
+        if not spaceranger_dir.rstrip(os.sep).endswith(sample_id):
+            spaceranger_dir = os.path.join(spaceranger_dir, sample_id)
 
     print(f'Using spaceranger outs: {spaceranger_dir}')
 

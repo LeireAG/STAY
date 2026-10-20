@@ -1,10 +1,11 @@
 paths:
   sample_list: resources/sample_list.csv
-  spaceranger: data/spaceranger/experiments
-  raw: data/raw
-  detachment_score: data/detachment_score
-  epithelial_annotation: data/epithelial_annotation
-  results: results/figure_1
+  # {cohort} is filled from the cohort column of sample_list (STAY or standard)
+  spaceranger: data/spaceranger/{cohort}
+  raw: data/raw_data/{cohort}
+  detachment_score: data/analysis/{cohort}/detachment_score
+  histopathology_annotation: data/histopathology_annotation/{cohort}
+  results: results/figure_2
 
 scoring:
   matrix: raw

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Score per-spot detachment from images and write CSVs.
 
-Reads config.yaml. Uses the raw barcode set, drops empty-tissue spots,
-writes data/detachment_score/{sample_id}.csv with barcode and detachment_score.
+Reads resources/detachment.yaml. Uses the raw barcode set, drops empty-tissue spots,
+writes data/analysis/detachment_score/{sample_id}.csv with barcode and detachment_score.
 
-  python scripts/run_detachment_pipeline.py
+  python code/figures/figure_2/run_detachment_pipeline.py
 """
 
 from __future__ import annotations
@@ -25,15 +25,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 CFG = yaml.safe_load((PROJECT_ROOT / "resources" / "detachment.yaml").read_text(encoding="utf-8"))
 
 SAMPLE_LIST = PROJECT_ROOT / CFG["paths"]["sample_list"]
-SPACERANGER_DIR = PROJECT_ROOT / CFG["paths"]["spaceranger"]
-RAW_DIR = PROJECT_ROOT / CFG["paths"]["raw"]
-OUT_DIR = PROJECT_ROOT / CFG["paths"]["detachment_score"]
+COHORT = pd.read_csv(SAMPLE_LIST, dtype=str).set_index("sample_id")["cohort"].to_dict()
 
 MATRIX_NAME = "filtered_feature_bc_matrix.h5" if CFG["scoring"]["matrix"] == "filtered" else "raw_feature_bc_matrix.h5"
 PATCH_SIZE_CYTASSIST = int(CFG["scoring"]["patch_size_cytassist"])
 PATCH_SIZE_HIRES = int(CFG["scoring"]["patch_size_hires"])
 EMPTY_TISSUE_EXPR = str(CFG["scoring"]["empty_tissue_expr"])
 DETACHMENT_SCORE_EXPR = str(CFG["scoring"]["detachment_score_expr"])
+
+
+def cohort_dir(key: str, sample_id: str) -> Path:
+    """Folder of the sample's cohort, e.g. data/spaceranger/STAY, from the {cohort} path template."""
+    return PROJECT_ROOT / CFG["paths"][key].format(cohort=COHORT[sample_id])
 
 
 def read_barcodes(sample_dir: Path) -> list[str]:
@@ -55,7 +58,7 @@ def read_spots(sample_dir: Path) -> pd.DataFrame:
 
 
 def read_cytassist_coords(sample_id: str, spots: pd.DataFrame) -> pd.DataFrame:
-    json_path = sorted((RAW_DIR / sample_id / "manual_alignment").glob("*.json"))[0]
+    json_path = sorted((cohort_dir("raw", sample_id) / sample_id / "manual_alignment").glob("*.json"))[0]
     with json_path.open() as handle:
         oligo = json.load(handle)["oligo"]
     cyt = pd.DataFrame(
@@ -120,7 +123,7 @@ def align_dynamic_range(source: pd.Series, target: pd.Series) -> pd.Series:
 
 
 def score_sample(sample_id: str) -> pd.DataFrame:
-    sample_dir = SPACERANGER_DIR / sample_id
+    sample_dir = cohort_dir("spaceranger", sample_id) / sample_id
     spots = read_cytassist_coords(sample_id, read_spots(sample_dir))
 
     spatial = sample_dir / "spatial"
@@ -165,11 +168,12 @@ def score_sample(sample_id: str) -> pd.DataFrame:
 
 
 def main() -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
     samples = pd.read_csv(SAMPLE_LIST)
     for sample_id in samples["sample_id"].astype(str):
         out = score_sample(sample_id)
-        path = OUT_DIR / f"{sample_id}.csv"
+        out_dir = cohort_dir("detachment_score", sample_id)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        path = out_dir / f"{sample_id}.csv"
         out.to_csv(path, index=False)
         print(f"wrote {path} ({len(out)} spots)", flush=True)
 

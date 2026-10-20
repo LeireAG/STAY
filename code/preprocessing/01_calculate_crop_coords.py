@@ -41,7 +41,8 @@ parser = argparse.ArgumentParser(description="Import Visium data & do basic QC",
 # Required
 parser.add_argument("--h5ad_dir", help="Path to directory for .h5ad output files")
 parser.add_argument("--sample_id", help="Sample ID")
-parser.add_argument("--project_dir", help="Path to the root of the project directory")
+parser.add_argument("--project_dir", help="Path to the root of the project directory",
+                    default=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 parser.add_argument("--res_dir", help="Path to results directory")
 parser.add_argument("--min_count", help="Minimal number of counts per spot", type=int)
 parser.add_argument("--min_gene", help="Minimal number of genes per spot", type=int)
@@ -58,7 +59,7 @@ project_dir = args["project_dir"]
 # --- Get some info from the sample sheet
 
 # Extract the external_id
-sample_dir = os.path.join(project_dir, 'config')
+sample_dir = os.path.join(project_dir, 'resources')
 sample_sheet_file = 'sample_sheet.csv'
 
 sample_sheet = pd.read_csv(os.path.join(sample_dir, sample_sheet_file))
@@ -188,7 +189,7 @@ plt.suptitle(f'{sample_id} ({subtype}) - Spots on hires image before + after cro
 # --- Also shift the original tissue_positions coordinates
 # In case we want to make an object from scratch
 # Load original tissue_positions file
-spatial_dir = os.path.join(project_dir, 'data', 'processed', 'spaceranger_outs', joined_id, 'outs', 'spatial')
+spatial_dir = os.path.join(project_dir, 'data', 'spaceranger', 'paired', joined_id, 'spatial')
 tissue_positions_file = 'tissue_positions.csv'
 
 tissue_positions = pd.read_csv(os.path.join(spatial_dir, tissue_positions_file))
@@ -202,7 +203,7 @@ tissue_positions_shifted['pxl_col_in_fullres'] = tissue_positions['pxl_col_in_fu
 
 # --- Save the output
 
-out_dir = os.path.join(project_dir, 'results/misc/crop_images/per_sample', sample_id)
+out_dir = os.path.join(project_dir, 'data', 'analysis', 'paired', 'crop_images', sample_id)
 os.makedirs(out_dir, exist_ok=True)
 
 # -- Save the cropped image

@@ -4,12 +4,16 @@ title: "cell_proportion_barplot"
 
 ```{r}
 library(semla)
+# Repo root, relative to this notebook (knitr runs chunks from the notebook's folder)
+project_dir <- normalizePath(file.path("..", "..", ".."))
+res_dir <- file.path(project_dir, "results", "figure_7")
+dir.create(res_dir, recursive = TRUE, showWarnings = FALSE)
 library(ggplot2)
 ```
 
 ```{r} 
 #Load data
-deconv <- readRDS(file = paste0("my_path", "vis_mod_nmf_decon.rds"))
+deconv <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_nmf_decon.rds"))
 ```
 
 ```{r}
@@ -162,7 +166,7 @@ library(RColorBrewer)
 celltype_colors <- brewer.pal(n = 9, name = "Set1")  # 9 colors for 9 cell types
 names(celltype_colors) <- names(celltype_percent)    # assign colors to cell types
 
-pdf <- "/my_path/Patient4_cell_proportions.pdf"
+pdf <- file.path(res_dir, "Patient4_cell_proportions.pdf")
 pdf(file = pdf, width = 10, height = 15)
 
 p <- ggplot(df_all, aes(x = section, y = percentage, fill = cell_type)) +
@@ -178,7 +182,7 @@ print(p)
 dev.off
 
 png_res <- 1200
-png(filename = "/my_path/Patient4_cell_proportions.png", width = 7*png_res, height = 12*png_res, res = png_res);print(p);dev.off()
+png(filename = file.path(res_dir, "Patient4_cell_proportions.png"), width = 7*png_res, height = 12*png_res, res = png_res);print(p);dev.off()
 ```
 
 #Continue with Patient 3
@@ -273,7 +277,7 @@ library(RColorBrewer)
 celltype_colors <- brewer.pal(n = 9, name = "Set1")  # 9 colors for 9 cell types
 names(celltype_colors) <- names(celltype_percent)    # assign colors to cell types
 
-pdf <- "/my_path/Patient3_cell_proportions.pdf"
+pdf <- file.path(res_dir, "Patient3_cell_proportions.pdf")
 pdf(file = pdf, width = 10, height = 15)
 
 p <- ggplot(df_all, aes(x = section, y = percentage, fill = cell_type)) +
@@ -289,7 +293,7 @@ print(p)
 dev.off
 
 png_res <- 1200
-png(filename = "/my_path/Patient3_cell_proportions.png", width = 7*png_res, height = 12*png_res, res = png_res);print(p);dev.off()
+png(filename = file.path(res_dir, "Patient3_cell_proportions.png"), width = 7*png_res, height = 12*png_res, res = png_res);print(p);dev.off()
 ```
 
 

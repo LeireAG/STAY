@@ -1,4 +1,10 @@
 .DS_Store
+__pycache__/
 
+# Data and results are not tracked. Each data folder keeps its README.md
+# so the layout (and where to download each part) stays browsable on git.
 /data/**
+!/data/**/
+!/data/**/README.md
 /results/**
+!/results/README.md

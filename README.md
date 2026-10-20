@@ -1,61 +1,88 @@
 # STAY
 
-# breast_cancer_visium_analysis
+Code for the study **"Adapting spatial transcriptomics to FFPE tissue sections prepared with routine histology workflows in clinical settings"**. STAY stands for Spatial Transcriptomics with Advanced tissue preparation for preserved data Yield: Visium CytAssist FFPE on in-house breast cancer sections.
 
-This repository contains code for Visium data preprocessing, downstream analysis, and figure generation for the study titled "Adapting spatial transcriptomics to FFPE tissue sections prepared with routine histology workflows in clinical settings". We refer to this protocol as Spatial Transcriptomics with Advanced tissue preparation for preserved data Yield (STAY). 
+## Repository structure
 
-# Data analysed
+```
+code/
+  preprocessing/     # paired cohort: cropping, object creation, annotation, QC
+  figures/           # one script or folder per figure
+data/                # not tracked by git: download the data into the matching folders
+  raw_data/                    # FASTQs, H&E/CytAssist images, Loupe alignments
+  spaceranger/                 # Space Ranger outs/ per sample
+  histopathology_annotation/   # QuPath GeoJSON + spot-level CSVs
+  analysis/                    # intermediate results (detachment scores, cropped images)
+  r_objects/                   # Seurat/semla .rds objects
+environment/         # conda env (Python) and renv (R)
+resources/           # sample list and Figure 2 config
+results/             # figure outputs, created by the scripts
+```
 
-In-house FFPE breast cancer tissue sections. 
-4 tissue sections analysed in 6.5x6.5 mm capture areas with Visium CytAssist FFPE chemistry
-4 tissue sections analysed in 11x11 mm capture areas with Visium CytAssist FFPE chemistry
+Each data folder is split into the four cohorts:
 
-# Overview of directories
+| Cohort | Description | Figures |
+|---|---|---|
+| `paired` | Paired STAY vs standard sections (4 in 6.5 x 6.5 mm, 4 in 11 x 11 mm capture areas) | 3, 6, 7 |
+| `lymph_node` | Lymph node sections | 8 |
+| `STAY` | STAY sections of the detachment analysis | 2 |
+| `standard` | Standard-protocol sections of the detachment analysis | 2 |
 
+Data goes in `data/<type>/<cohort>/<sample_id>/`. Each of those cohort folders has a `README.md` with its expected layout and download source. The `STAY` and `standard` samples used in Figure 2 are listed in `resources/sample_list.csv`.
 
+## Data availability
 
-# code/
+- **Processed data** (Space Ranger output, annotations, analysis results, Seurat objects): <PROCESSED_DATA_DOI>
+- **Raw data** (`data/raw_data/`: FASTQs, images, Loupe alignments): <RAW_DATA_ACCESSION>
+- **STAY cohort:** https://doi.org/10.6019/S-BIAD3080 and https://doi.org/10.5281/zenodo.18917100
 
-Contains the scripts to generate the analysis and figures in this study. Data paths in the scripts may need to be adjusted. By default, they assume a local directory structure matching this repository. Data needs to be downloaded from KTH Data Repository at insert_DOI. Please check Data availability section. 
+The paired figure scripts only need the final object, `data/r_objects/paired/vis_mod_nmf_decon.rds`. It contains the pathology annotations, normalized data, NMF and deconvolution results.
 
-# preprocessing/
+## Setup
 
-- 01_calculate_crop_coords.py - Crops H&E images to the 6.5x6.5 mm or 11x11 mm area and adjusts spot coordinates.  
-- 02_make_semla_object.R - The cropped images in crop_images directory and adjusted spot coordinates are used to create a seurat object all_samples_cropped_img.rds.
-- 03_loading_reviewed_path_annotation copy.Rmd - Loads pathology annotations in the previous seurat object vis_mod_anno.rds, generates spot annotation plots in Figure 3 C1-4, F1-4, violin plots in Figure 6 J, K and stats in Supplementary Data 1. Contains the code to generate spot path annotation plots in Figure 3 and Suppl Figs. 
-- 04_QC_normalization_scaling.Rmd - Steps of quality control, scaling and normalization of the data. Generates a normalized Seurat object vis_mod_norm used in figure_3_on_reviewed_annotations_copy.Rmd. 
-Contains the code to generate the UMAP in Figure 6F.
-- qupath_to_loupe.py - Produces spot based pathology annotation in .csv format in reworked_annotations directory to be used in the 03_loading_reviewed_path_annotation copy.Rmd script
+```bash
+conda env create -f environment/detachment-score.yaml    # Python (Figure 2)
+Rscript -e 'renv::restore(project = "environment")'      # R packages
+```
 
-# figs/
+In R, load the environment with `renv::load("environment")` before running a notebook. All paths are relative to the repository root. Run the Python scripts and `02_make_semla_object.R` from the root, and knit the notebooks from their own folder (the RStudio default).
 
-- renv - Copy of Rstudio local environment where we performed the analysis. Contains the versions of R packages. 
-- renv.lock - Lists exact package versions in the project-specific environment 
-- figure_2/ - code to execute detachment rate estimation, corresponding statistical testing and plotting from spaceranger outputs across STAY and standard protocols. 
-- figure_7/ - generates a normalized with corrected number of spots Seurat object including nmf and deconvolution vis_mod_nmf_decon.rds
+## Running the analysis
 
-- figure_7_copy.Rmd contains the code to run Non-Negative_matrix Factorization and saving that Seurat object. Generates fig. 7 A, B, D1-I1 and D2-I2. Used for ploting factors spatially for supplementary figs 4-11. 
-- semla_deconvolution.rmd contains the code to run the NNLS deconvolution method included in the Semla package on the previous object containing NMF factors
-- cell_proportion_barplot_figure_7K.Rmd contains the code to generate stacked barplots of cell-type proportions for Patients 3 and 4.
+**Preprocessing (paired)**, in order, in `code/preprocessing/`:
 
-- figure_3_on_reviewed_annotations_copy.Rmd generates spatial plots of normalized unique genes per spot (figure 6 A-H), spot number barplots in Figure 3 G1-4 and violin plots in Figure 6 C. 
-- scatter_plots_figure_6E.Rmd contains the code to generate correlation plots for all patients
+1. `01_calculate_crop_coords.py`: crops H&E images to the capture area and shifts the spot coordinates.
+2. `02_make_semla_object.R`: builds the semla object from the cropped images.
+3. `qupath_to_loupe.py`: converts QuPath annotations to spot-level CSVs (`--cohort`, default `paired`).
+4. `03_loading_reviewed_path_annotation copy.Rmd`: adds the pathology annotations (Figure 3 C/F, Figure 6 J/K, Supplementary Data 1).
+5. `04_QC_normalization_scaling.Rmd`: QC, normalization and scaling (Figure 6F).
 
-- lymph_node_analysis.qmd generates figure 8 and contains the code for the analysis of lymph node samples.
+**Figure 2 (STAY vs standard)**: settings are in `resources/detachment.yaml`.
 
+```bash
+conda activate detachment-score
+python code/figures/figure_2/run_detachment_pipeline.py   # per-spot detachment scores
+python code/figures/figure_2/plot_detachment_cohort.py    # cohort plots and statistics
+python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial panels
+```
 
-# Data availability
+**Other figures**, in `code/figures/`:
 
-Full resolution hematoxylin-eosin images and Seurat objects will be uploaded to the KTH Data Repository insert DOI. 
+| Script | Figure |
+|---|---|
+| `figure_6_on_reviewed_annotations_copy.Rmd` | 6 A-H, 6C, 3 G |
+| `scatter_plots_figure_6E.Rmd` | 6E |
+| `figure_7/figure_7_copy.Rmd` | 7 A, B, D-I; Supplementary Figures 4-11 (NMF) |
+| `figure_7/semla_deconvolution.rmd` | deconvolution used in Figure 7 |
+| `figure_7/cell_proportion_barplot_figure_7K.Rmd` | 7K |
+| `lymph_node_analysis.qmd` | 8 |
 
-Although intermediate Seurat objects were generated during analysis (one per major processing step), only the final object is required to run the scripts here. The final seurat object contains all relevant information including pathology annotations, normalized data, NMF results, and deconvolution. 
-The object can be downloaded from the KTH Data Repository at: insert_DOI_here
-Note: In the scripts, variable names for the Seurat object may differ between steps, reflecting the sequential workflow used during development.
+Outputs go to `results/<figure>/`, and to `results/preprocessing/` for the preprocessing plots.
 
-# Confidentiality
+## Confidentiality
 
-This repository is shared in the context of peer review. Please do not use or redistribute the STAY protocol or code prior to publication.
+This repository is shared for peer review. Please do not use or redistribute the STAY protocol or code before publication.
 
-# Contact
+## Contact
 
-First author: Leire Alonso Galicia [leire.alonso@scilifelab.se](mailto:leire.alonso@scilifelab.se) 
+First author: Leire Alonso Galicia [leire.alonso@scilifelab.se](mailto:leire.alonso@scilifelab.se)

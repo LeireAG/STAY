@@ -4,7 +4,7 @@
 Row 1: H&E; CytAssist; pathology/epithelial annotation
 Row 2: detachment score; detachment assignment; unique genes
 
-  python scripts/plot_detachment_spatial.py
+  python code/figures/figure_2/plot_detachment_spatial.py
 """
 
 from __future__ import annotations
@@ -28,14 +28,12 @@ warnings.filterwarnings("ignore", message="Use `squidpy.pl.spatial_scatter`")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from plot_detachment_cohort import assign_detached
-from run_detachment_pipeline import MATRIX_NAME, SPACERANGER_DIR, read_cytassist_coords, read_image, read_spots
+from run_detachment_pipeline import MATRIX_NAME, cohort_dir, read_cytassist_coords, read_image, read_spots
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 CFG = yaml.safe_load((PROJECT_ROOT / "resources" / "detachment.yaml").read_text(encoding="utf-8"))
 
 SAMPLE_LIST = PROJECT_ROOT / CFG["paths"]["sample_list"]
-SCORE_DIR = PROJECT_ROOT / CFG["paths"]["detachment_score"]
-EPITHELIAL_DIR = PROJECT_ROOT / CFG["paths"]["epithelial_annotation"]
 OUT_DIR = PROJECT_ROOT / CFG["paths"]["results"] / "detachment_spatial"
 
 ASSIGN_PALETTE = {"not detached": "#D0D0D0", "detached": "#C0392B"}
@@ -62,7 +60,7 @@ def apply_style() -> None:
 def score_limits(sample_ids: list[str]) -> tuple[float, float]:
     vals = []
     for sample_id in sample_ids:
-        s = pd.to_numeric(pd.read_csv(SCORE_DIR / f"{sample_id}.csv")["detachment_score"], errors="coerce")
+        s = pd.to_numeric(pd.read_csv(cohort_dir("detachment_score", sample_id) / f"{sample_id}.csv")["detachment_score"], errors="coerce")
         vals.append(s.dropna())
     all_scores = pd.concat(vals, ignore_index=True)
     return float(all_scores.quantile(0.01)), float(all_scores.quantile(0.99))
@@ -84,7 +82,7 @@ def align_cytassist_to_hires(
 
 
 def read_unique_genes(sample_id: str, barcodes: pd.Series) -> pd.Series:
-    path = SPACERANGER_DIR / sample_id / MATRIX_NAME
+    path = cohort_dir("spaceranger", sample_id) / sample_id / MATRIX_NAME
     with h5py.File(path, "r") as f:
         mat = f["matrix"]
         all_bc = [x.decode() if isinstance(x, bytes) else str(x) for x in mat["barcodes"][:]]
@@ -96,7 +94,7 @@ def read_unique_genes(sample_id: str, barcodes: pd.Series) -> pd.Series:
 
 
 def load_path_annotation(sample_id: str, barcodes: pd.Series) -> pd.Series:
-    epi_path = EPITHELIAL_DIR / sample_id / "csv" / f"{sample_id}_epithelial.csv"
+    epi_path = cohort_dir("histopathology_annotation", sample_id) / sample_id / "csv" / f"{sample_id}_epithelial.csv"
     barcodes_str = barcodes.astype(str)
     if not epi_path.exists():
         return pd.Series(["non-epithelial"] * len(barcodes_str), index=barcodes_str, name="path_annotation")
@@ -111,7 +109,7 @@ def load_path_annotation(sample_id: str, barcodes: pd.Series) -> pd.Series:
 def build_path_palette(sample_ids: list[str]) -> dict[str, str]:
     labels: set[str] = set()
     for sid in sample_ids:
-        epi_path = EPITHELIAL_DIR / sid / "csv" / f"{sid}_epithelial.csv"
+        epi_path = cohort_dir("histopathology_annotation", sid) / sid / "csv" / f"{sid}_epithelial.csv"
         if epi_path.exists():
             epi = pd.read_csv(epi_path, usecols=["annotation"])
             labels.update(epi["annotation"].astype(str).unique().tolist())
@@ -125,8 +123,8 @@ def build_path_palette(sample_ids: list[str]) -> dict[str, str]:
 
 
 def load_adata(sample_id: str) -> tuple[ad.AnnData, np.ndarray, np.ndarray]:
-    sample_dir = SPACERANGER_DIR / sample_id
-    scores = pd.read_csv(SCORE_DIR / f"{sample_id}.csv")
+    sample_dir = cohort_dir("spaceranger", sample_id) / sample_id
+    scores = pd.read_csv(cohort_dir("detachment_score", sample_id) / f"{sample_id}.csv")
     scores["barcode"] = scores["barcode"].astype(str)
 
     spots = read_cytassist_coords(sample_id, read_spots(sample_dir))

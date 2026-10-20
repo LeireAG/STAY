@@ -2,6 +2,10 @@
 ---
 ```{r}
 library(semla)
+# Repo root, relative to this notebook (knitr runs chunks from the notebook's folder)
+project_dir <- normalizePath(file.path("..", ".."))
+res_dir <- file.path(project_dir, "results", "figure_6")
+dir.create(res_dir, recursive = TRUE, showWarnings = FALSE)
 library(dplyr)
 library(ggplot2)
 library(ggpubr)
@@ -10,7 +14,7 @@ library(patchwork)
 
 ```{r}
 # Load data 
-vis_mod_norm <- readRDS(file = paste0("my_path_to_Seurat_object", "vis_mod_nmf_decon.rds"))
+vis_mod_norm <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_nmf_decon.rds"))
 # Normalization applies to gene expression values, not to the count of detected genes
 ```
 
@@ -139,10 +143,10 @@ p1 + p1_det
 
 ```{r}
 # save plots as JPEG
-jpeg(filename = "/my_path/patient1_gene_scatter_counts.jpg", width = 1000, height = 1000, res = 300)
+jpeg(filename = file.path(res_dir, "patient1_gene_scatter_counts.jpg"), width = 1000, height = 1000, res = 300)
 print(p1)
 dev.off()
-jpeg(filename = "/my_path/patient1_gene_scatter_det_rate.jpg", width = 1000, height = 1000, res = 300)
+jpeg(filename = file.path(res_dir, "patient1_gene_scatter_det_rate.jpg"), width = 1000, height = 1000, res = 300)
 print(p1_det)
 dev.off()
 ```
@@ -212,10 +216,10 @@ p2 + p2_det
 ```
 
 ```{r}
-jpeg(filename = "/my_path/patient2_gene_scatter_counts.jpg", width = 1000, height = 1000, res = 300)
+jpeg(filename = file.path(res_dir, "patient2_gene_scatter_counts.jpg"), width = 1000, height = 1000, res = 300)
 print(p2)
 dev.off()
-jpeg(filename = "/my_path/patient2_gene_scatter_det_rate.jpg", width = 1000, height = 1000, res = 300)
+jpeg(filename = file.path(res_dir, "patient2_gene_scatter_det_rate.jpg"), width = 1000, height = 1000, res = 300)
 print(p2_det)
 dev.off()
 ```
@@ -282,10 +286,10 @@ p3_det <- ggplot(gene_attr, aes(x = standard_det_rate, y = STAY_det_rate)) +
 p3 + p3_det
 ```
 ```{r}
-jpeg(filename = "/my_path/patient3_gene_scatter_counts.jpg", width = 1000, height = 1000, res = 300)
+jpeg(filename = file.path(res_dir, "patient3_gene_scatter_counts.jpg"), width = 1000, height = 1000, res = 300)
 print(p3)
 dev.off()
-jpeg(filename = "/my_path/patient3_gene_scatter_det_rate.jpg", width = 1000, height = 1000, res = 300)
+jpeg(filename = file.path(res_dir, "patient3_gene_scatter_det_rate.jpg"), width = 1000, height = 1000, res = 300)
 print(p3_det)
 dev.off()
 ```
@@ -355,10 +359,10 @@ p4 + p4_det
 ```
 
 ```{r}
-jpeg(filename = "/my_path/patient4_gene_scatter_counts.jpg", width = 1000, height = 1000, res = 300)
+jpeg(filename = file.path(res_dir, "patient4_gene_scatter_counts.jpg"), width = 1000, height = 1000, res = 300)
 print(p4)
 dev.off()
-jpeg(filename = "/my_path/patient4_gene_scatter_det_rate.jpg", width = 1000, height = 1000, res = 300)
+jpeg(filename = file.path(res_dir, "patient4_gene_scatter_det_rate.jpg"), width = 1000, height = 1000, res = 300)
 print(p4_det)
 dev.off()
 ```

@@ -4,6 +4,10 @@ Aim: Comparison of the sensitivity of the standard vs. the STAY method.
 Load packages 
 ```{r}
 library(semla)
+# Repo root, relative to this notebook (knitr runs chunks from the notebook's folder)
+project_dir <- normalizePath(file.path("..", ".."))
+res_dir <- file.path(project_dir, "results", "figure_6")
+dir.create(res_dir, recursive = TRUE, showWarnings = FALSE)
 library(ggplot2)
 library(tidyverse)
 library(dplyr)
@@ -18,7 +22,7 @@ vis_mod_norm <- vis_mod |>
 Load normalized Seurat object 
 ```{r}
 # Load data (new Seurat object modified by Sophie) with my added annotations
-vis_mod_norm <- readRDS(file = paste0("/my_path/", "vis_mod_norm.rds"))
+vis_mod_norm <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_norm.rds"))
 # Normalization applies to gene expression values, not to the count of detected genes
 ```
 
@@ -27,8 +31,8 @@ vis_mod_norm <- readRDS(file = paste0("/my_path/", "vis_mod_norm.rds"))
 ```{r width = 8, height = 6}
 #use magma color and no background images to reflect data loss due to tissue detachment. 
 
-pdf_path_small <- "/my_path/small_samples_purple_plot.pdf"
-pdf_path_large <- "/my_path/large_samples_purple_plot.pdf"
+pdf_path_small <- file.path(res_dir, "small_samples_purple_plot.pdf")
+pdf_path_large <- file.path(res_dir, "large_samples_purple_plot.pdf")
 
 
 # Plot small capture area samples (6.5x6.5mm) with a larger point size
@@ -47,7 +51,7 @@ p_small <- MapFeatures(vis_mod_norm,
 print(p_small)
 dev.off()
 png_res <- 1200
-png(filename = "/my_path/unique_genes_per_spot_small_samples_plot_purple.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_small);dev.off()
+png(filename = file.path(res_dir, "unique_genes_per_spot_small_samples_plot_purple.png"), width = 8*png_res, height = 6*png_res, res = png_res);print(p_small);dev.off()
 
 #Plot large area samples (11x11mm) with a smaller point size
 pdf(file = pdf_path_large, width = 8, height = 6)
@@ -64,7 +68,7 @@ p_large <- MapFeatures(vis_mod_norm,
 dev.off()
 
 png_res <- 1200
-png(filename = "/my_path/large_samples_plot_purple.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_large);dev.off()
+png(filename = file.path(res_dir, "large_samples_plot_purple.png"), width = 8*png_res, height = 6*png_res, res = png_res);print(p_large);dev.off()
 
 ```
 
@@ -72,8 +76,8 @@ png(filename = "/my_path/large_samples_plot_purple.png", width = 8*png_res, heig
 ```{r width = 8, height = 6}
 #use magma color and no background images to reflect data loss due to tissue detachment. 
 
-pdf_path_small <- "/my_path/small_samples_purple_plot_UMI.pdf"
-pdf_path_large <- "/my_path/large_samples_purple_plot_UMI.pdf"
+pdf_path_small <- file.path(res_dir, "small_samples_purple_plot_UMI.pdf")
+pdf_path_large <- file.path(res_dir, "large_samples_purple_plot_UMI.pdf")
 
 
 # Plot small capture area samples (6.5x6.5mm) with a larger point size
@@ -92,7 +96,7 @@ p_small <- MapFeatures(vis_mod_norm,
 print(p_small)
 dev.off()
 png_res <- 1200
-png(filename = "/my_path/UMI_counts_per_spot_small_samples_plot_purple.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_small);dev.off()
+png(filename = file.path(res_dir, "UMI_counts_per_spot_small_samples_plot_purple.png"), width = 8*png_res, height = 6*png_res, res = png_res);print(p_small);dev.off()
 
 #Plot large area samples (11x11mm) with a smaller point size
 pdf(file = pdf_path_large, width = 8, height = 6)
@@ -109,14 +113,14 @@ p_large <- MapFeatures(vis_mod_norm,
 dev.off()
 
 png_res <- 1200
-png(filename = "/my_path/UMI_counts_per_spot_large_samples_plot_purple.png", width = 8*png_res, height = 6*png_res, res = png_res);print(p_large);dev.off()
+png(filename = file.path(res_dir, "UMI_counts_per_spot_large_samples_plot_purple.png"), width = 8*png_res, height = 6*png_res, res = png_res);print(p_large);dev.off()
 
 ```
 
 
 ```{r}
 # Load data (new Seurat object modified by Sophie) with my added annotations
-vis_mod <- readRDS(file = paste0("/your_path/", "vis_mod_nmf_decon.rds"))
+vis_mod <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_nmf_decon.rds"))
 ```
 
 This generates Figure 3 G1-G4. 
@@ -154,7 +158,7 @@ spots_by_method <- vis_mod_anno@meta.data %>%
 print (spots_by_method)
 
 png_res <- 1200
-png(filename = "my_path/spots_by_method.png", width = 10*png_res, height = 8*png_res, res = png_res);print(spots_by_method);dev.off()
+png(filename = file.path(res_dir, "spots_by_method.png"), width = 10*png_res, height = 8*png_res, res = png_res);print(spots_by_method);dev.off()
 ```
 
 Violin plot of unique genes generates Figure 6C
@@ -184,7 +188,7 @@ unique_genesVplot <- unique_genesVplot + geom_boxplot(
 )
 print(unique_genesVplot)
 png_res <- 1200
-png(filename = "/my_path/unique_genes_by_method.png", width = 10*png_res, height = 8*png_res, res = png_res);print(unique_genesVplot);dev.off()
+png(filename = file.path(res_dir, "unique_genes_by_method.png"), width = 10*png_res, height = 8*png_res, res = png_res);print(unique_genesVplot);dev.off()
 ```
 
 Violin plot of unique UMI generates Figure 6D
@@ -215,6 +219,6 @@ unique_UMIsVplot <- unique_UMIsVplot + geom_boxplot(
   #scale_y_continuous(limits = c(0, 20000)) # limits visible y-axis range and trims violin plots to fit
 print(unique_UMIsVplot)
 png_res <- 1200
-png(filename = "/my_path/UMIs_by_method.png", width = 10*png_res, height = 8*png_res, res = png_res);print(unique_UMIsVplot);dev.off()
+png(filename = file.path(res_dir, "UMIs_by_method.png"), width = 10*png_res, height = 8*png_res, res = png_res);print(unique_UMIsVplot);dev.off()
 ```
 

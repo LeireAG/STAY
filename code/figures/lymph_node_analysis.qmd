@@ -10,6 +10,10 @@ editor: visual
 #library(hdf5r)
 #library(Seurat)
 library(semla)
+# Repo root, relative to this notebook (knitr runs chunks from the notebook's folder)
+project_dir <- normalizePath(file.path("..", ".."))
+res_dir <- file.path(project_dir, "results", "figure_8")
+dir.create(res_dir, recursive = TRUE, showWarnings = FALSE)
 library(ggplot2)
 ```
 
@@ -18,15 +22,16 @@ library(ggplot2)
 ```{r}
 #create spatial object for all samples
 #define root directory
-visium_dir <- "/my_path/"
+visium_dir <- file.path(project_dir, "data", "spaceranger", "lymph_node")
 #Get the slide IDs
-slide_directories <- list.dirs( path = visium_dir, full.names = TRUE, recursive = FALSE ) slide_id_list <- basename(slide_directories)
+slide_directories <- list.dirs( path = visium_dir, full.names = TRUE, recursive = FALSE )
+slide_id_list <- basename(slide_directories)
 
 #Get the required files
-samples <- file.path( slide_directories, "output_data", slide_id_list, "outs", "filtered_feature_bc_matrix.h5" ) 
-imgs <- file.path( slide_directories, "output_data", slide_id_list, "outs", "spatial", "tissue_hires_image.png" ) 
-spotfiles <- file.path( slide_directories, "output_data", slide_id_list, "outs", "spatial", "tissue_positions.csv" ) 
-json <- file.path( slide_directories, "output_data", slide_id_list, "outs", "spatial", "scalefactors_json.json" )
+samples <- file.path( slide_directories, "filtered_feature_bc_matrix.h5" ) 
+imgs <- file.path( slide_directories, "spatial", "tissue_hires_image.png" ) 
+spotfiles <- file.path( slide_directories, "spatial", "tissue_positions.csv" ) 
+json <- file.path( slide_directories, "spatial", "scalefactors_json.json" )
 
 #Check that all samples exist
 file_check <- data.frame( sample_id = slide_id_list, samples = file.exists(samples), imgs = file.exists(imgs), spotfiles = file.exists(spotfiles), json = file.exists(json), stringsAsFactors = FALSE ) 
@@ -61,7 +66,7 @@ MapFeatures(se, features = "nFeature_Spatial",
 
 #Save the object
 
-out_dir <- "/my_path/rds_objects/"
+out_dir <- file.path(project_dir, "data", "r_objects", "lymph_node")
 filename <- "lymph_nodes.rds"
 
 saveRDS(se, file.path(out_dir, filename))
@@ -72,7 +77,7 @@ saveRDS(se, file.path(out_dir, filename))
 
 ```{r, fig.height=8, fig.width=10}
 # Derived from raw counts
-pdf_path_gene <- "/my_path/Spatial_plot_genes.pdf"
+pdf_path_gene <- file.path(res_dir, "Spatial_plot_genes.pdf")
 
 pdf(file = pdf_path_gene, width = 10, height = 8)
 gene_plot <- MapFeatures(se, 
@@ -87,7 +92,7 @@ print(gene_plot)
 dev.off
 
 
-pdf_path_UMI <-  "/my_path/Spatial_plot_UMIs.pdf"
+pdf_path_UMI <-  file.path(res_dir, "Spatial_plot_UMIs.pdf")
 pdf(file = pdf_path_UMI, width = 10, height = 8)
 UMI_plot <- MapFeatures(se, 
                         features = "nCount_Spatial",
@@ -123,7 +128,7 @@ Vplot_genes <- Vplot_genes + geom_boxplot(
 
 print(Vplot_genes)
 png_res <- 1200
-png(filename = "/my_path/unique_genes_Violin.png", width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_genes);dev.off()
+png(filename = file.path(res_dir, "unique_genes_Violin.png"), width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_genes);dev.off()
 
 
 Vplot_UMI <- VlnPlot(
@@ -148,7 +153,7 @@ Vplot_UMI <- Vplot_UMI + geom_boxplot(
 
 print(Vplot_UMI)
 png_res <- 1200
-png(filename = "/my_path/unique_counts_Violin.png", width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_UMI);dev.off()
+png(filename = file.path(res_dir, "unique_counts_Violin.png"), width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_UMI);dev.off()
 ```
 
 ### Data preprocessing
@@ -157,7 +162,7 @@ png(filename = "/my_path/unique_counts_Violin.png", width = 10*png_res, height =
 
 ```{r}
 # Load data semla object
-se <- readRDS(file = paste0("/my_path/rds_objects/", "lymph_nodes.rds"))
+se <- readRDS(file = file.path(project_dir, "data", "r_objects", "lymph_node", "lymph_nodes.rds"))
 ```
 
 ```{r}
@@ -324,7 +329,7 @@ m_filtered
 
 #Save the filtered object
 
-out_dir <- "/my_path/rds_objects/"
+out_dir <- file.path(project_dir, "data", "r_objects", "lymph_node")
 filename <- "lymph_nodes_filtered.rds"
 
 saveRDS(se_filtered, file.path(out_dir, filename))
@@ -332,13 +337,13 @@ saveRDS(se_filtered, file.path(out_dir, filename))
 # Save plots as PNG 
 
 png_res <- 1200
-png(filename = "/my_path/percent_mito.png", width = 15*png_res, height = 8*png_res, res = png_res);print(m);dev.off()
+png(filename = file.path(res_dir, "percent_mito.png"), width = 15*png_res, height = 8*png_res, res = png_res);print(m);dev.off()
 
-png(filename = "/my_path/percent_mito_filtered.png", width = 15*png_res, height = 8*png_res, res = png_res);print(m_filtered);dev.off()
+png(filename = file.path(res_dir, "percent_mito_filtered.png"), width = 15*png_res, height = 8*png_res, res = png_res);print(m_filtered);dev.off()
 
-png(filename = "/my_path/total_counts.png", width = 15*png_res, height = 8*png_res, res = png_res);print(c);dev.off()
+png(filename = file.path(res_dir, "total_counts.png"), width = 15*png_res, height = 8*png_res, res = png_res);print(c);dev.off()
 
-png(filename = "/my_path/total_counts_filtrered.png", width = 15*png_res, height = 8*png_res, res = png_res);print(d);dev.off()
+png(filename = file.path(res_dir, "total_counts_filtrered.png"), width = 15*png_res, height = 8*png_res, res = png_res);print(d);dev.off()
 
 ```
 
@@ -346,7 +351,7 @@ png(filename = "/my_path/total_counts_filtrered.png", width = 15*png_res, height
 
 ```{r}
 #load the filtered object!!
-se <- readRDS(file = paste0("/my_path/", "lymph_nodes_filtered.rds"))
+se <- readRDS(file = file.path(project_dir, "data", "r_objects", "lymph_node", "lymph_nodes_filtered.rds"))
 
 ncol(se)
 
@@ -396,7 +401,7 @@ p <- DimPlot(se,
 p
 # Variability per sample
 
-png(filename = "/my_path/UMAP_before_harmony.png", width = 10*png_res, height = 7*png_res, res = png_res);print(p);dev.off()
+png(filename = file.path(res_dir, "UMAP_before_harmony.png"), width = 10*png_res, height = 7*png_res, res = png_res);print(p);dev.off()
 ```
 
 ### 6. Batch effect correction
@@ -428,7 +433,7 @@ h <- DimPlot(
   ggplot2::ggtitle("UMAP on after harmony")
 h
 
-png(filename = "/my_path/UMAP_after_harmony.png", width = 10*png_res, height = 7*png_res, res = png_res);print(h);dev.off()
+png(filename = file.path(res_dir, "UMAP_after_harmony.png"), width = 10*png_res, height = 7*png_res, res = png_res);print(h);dev.off()
 
 # Let's look how most variable genes map so we are not removing patient-specific signal
 a <- FeaturePlot(
@@ -444,7 +449,7 @@ a <- FeaturePlot(
   )
 )
 a
-png(filename = "/my_path/variable_genes_before_harmony.png", width = 8*png_res, height = 15*png_res, res = png_res);print(a);dev.off()
+png(filename = file.path(res_dir, "variable_genes_before_harmony.png"), width = 8*png_res, height = 15*png_res, res = png_res);print(a);dev.off()
 
 
 b <- FeaturePlot(
@@ -460,10 +465,10 @@ b <- FeaturePlot(
   )
 )
 b
-png(filename = "/my_path/variable_genes_after_harmony.png", width = 15*png_res, height = 8*png_res, res = png_res);print(b);dev.off()
+png(filename = file.path(res_dir, "variable_genes_after_harmony.png"), width = 15*png_res, height = 8*png_res, res = png_res);print(b);dev.off()
 
 # Save final object
-out_dir <- "/my_path/"
+out_dir <- file.path(project_dir, "data", "r_objects", "lymph_node")
 filename <- "lymph_nodes_final.rds"
 
 saveRDS(se, file.path(out_dir, filename))
@@ -560,7 +565,7 @@ fea_results_nmf_6 |> select(p_value, term_size, query_size, intersection_size, t
 
 ```{r}
 # Save se_nmf object 
-out_dir <- "/my_path/"
+out_dir <- file.path(project_dir, "data", "r_objects", "lymph_node")
 filename <- "lymph_nodes_nmf.rds"
 
 saveRDS(se_nmf, file.path(out_dir, filename))
@@ -569,7 +574,7 @@ saveRDS(se_nmf, file.path(out_dir, filename))
 #### Saving plots
 
 ```{r}
-output_dir <- "/my_path/"
+output_dir <- res_dir
 dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 
 ggsave(
@@ -660,7 +665,7 @@ Vplot_genes <- Vplot_genes + geom_boxplot(
 
 print(Vplot_genes)
 png_res <- 1200
-png(filename = "/my_path/unique_genes_Violin_selected_samples.png", width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_genes);dev.off()
+png(filename = file.path(res_dir, "unique_genes_Violin_selected_samples.png"), width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_genes);dev.off()
 
 
 Vplot_counts <- VlnPlot(
@@ -697,6 +702,6 @@ Vplot_counts <- Vplot_counts + geom_boxplot(
 
 print(Vplot_counts)
 png_res <- 1200
-png(filename = "/my_path/unique_counts_Violin_selected_samples.png", width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_counts);dev.off()
+png(filename = file.path(res_dir, "unique_counts_Violin_selected_samples.png"), width = 10*png_res, height = 8*png_res, res = png_res);print(Vplot_counts);dev.off()
 
 ```

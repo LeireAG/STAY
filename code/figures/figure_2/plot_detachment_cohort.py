@@ -12,7 +12,7 @@ Also writes two summary CSVs:
   - detachment_cohort_summary.csv: one row per (metric, cohort) with
     n/mean/median/std/min/max and a Mann-Whitney U cohort comparison
 
-  python scripts/plot_detachment_cohort.py
+  python code/figures/figure_2/plot_detachment_cohort.py
 """
 
 from __future__ import annotations
@@ -31,14 +31,12 @@ from scipy.sparse import csc_matrix
 from scipy.stats import mannwhitneyu
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_detachment_pipeline import MATRIX_NAME, SPACERANGER_DIR
+from run_detachment_pipeline import MATRIX_NAME, cohort_dir
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 CFG = yaml.safe_load((PROJECT_ROOT / "resources" / "detachment.yaml").read_text(encoding="utf-8"))
 
 SAMPLE_LIST = PROJECT_ROOT / CFG["paths"]["sample_list"]
-SCORE_DIR = PROJECT_ROOT / CFG["paths"]["detachment_score"]
-EPITHELIAL_DIR = PROJECT_ROOT / CFG["paths"]["epithelial_annotation"]
 RESULTS_DIR = PROJECT_ROOT / CFG["paths"]["results"]
 COHORT_COLORS = CFG["colors"]["cohort"]
 COHORT_ORDER = ["standard", "STAY"]
@@ -162,7 +160,7 @@ def cohort_legend() -> list[Patch]:
 
 
 def read_spot_metrics(sample_id: str, barcodes: pd.Series) -> pd.DataFrame:
-    path = SPACERANGER_DIR / sample_id / MATRIX_NAME
+    path = cohort_dir("spaceranger", sample_id) / sample_id / MATRIX_NAME
     with h5py.File(path, "r") as f:
         mat = f["matrix"]
         all_bc = [x.decode() if isinstance(x, bytes) else str(x) for x in mat["barcodes"][:]]
@@ -196,7 +194,7 @@ def load_summaries() -> tuple[pd.DataFrame, pd.DataFrame]:
     for _, row in samples.iterrows():
         sample_id = str(row["sample_id"])
         cohort = str(row["cohort"])
-        scores = pd.read_csv(SCORE_DIR / f"{sample_id}.csv")
+        scores = pd.read_csv(cohort_dir("detachment_score", sample_id) / f"{sample_id}.csv")
         scores["barcode"] = scores["barcode"].astype(str)
         scores["detachment_score"] = pd.to_numeric(scores["detachment_score"], errors="coerce")
         scores["detached"] = assign_detached(scores["detachment_score"])
@@ -216,7 +214,7 @@ def load_summaries() -> tuple[pd.DataFrame, pd.DataFrame]:
             }
         )
 
-        epi_path = EPITHELIAL_DIR / sample_id / "csv" / f"{sample_id}_epithelial.csv"
+        epi_path = cohort_dir("histopathology_annotation", sample_id) / sample_id / "csv" / f"{sample_id}_epithelial.csv"
         if epi_path.exists():
             epi = pd.read_csv(epi_path)
             epi["barcode"] = epi["barcode"].astype(str)

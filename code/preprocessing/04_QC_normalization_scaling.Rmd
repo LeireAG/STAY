@@ -3,6 +3,10 @@
 ```{r}
 # Load packages
 library(semla)
+# Repo root, relative to this notebook (knitr runs chunks from the notebook's folder)
+project_dir <- normalizePath(file.path("..", ".."))
+res_dir <- file.path(project_dir, "results", "preprocessing")
+dir.create(res_dir, recursive = TRUE, showWarnings = FALSE)
 library(ggplot2)
 library(tidyverse)
 library(dplyr)
@@ -10,12 +14,12 @@ library(dplyr)
 
 ```{r}
 # Load data (Seurat object with corrected image size and path annotations) 
-vis_mod <- readRDS(file = paste0("my_path_to_Seurat_object", "vis_mod_anno.rds"))
+vis_mod <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_anno.rds"))
 ```
 
 ```{r}
 # Load data (Seurat object with corrected image size and path annotations) and filtered spots artifacts
-vis_mod <- readRDS(file = paste0("my_path_to_Seurat_object", "vis_mod_nmf_decon.rds"))
+vis_mod <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_nmf_decon.rds"))
 ```
 
 1.QC
@@ -77,7 +81,7 @@ QC_all_samples <- VlnPlot(vis_mod, group.by = "sample_id", split.by = "method", 
 QC_all_samples
 
 png_res <- 1200
-png(filename = "my_path/QC_all_samples.png", width = 15*png_res, height = 8*png_res, res = png_res);print(QC_all_samples);dev.off()
+png(filename = file.path(res_dir, "QC_all_samples.png"), width = 15*png_res, height = 8*png_res, res = png_res);print(QC_all_samples);dev.off()
 ```
 
 Plot spatially to understand ViolinPlots
@@ -91,7 +95,7 @@ m
 
 ```{r}
 saveRDS(vis_mod,
-        file = paste0("/my_path/", "vis_mod_anno_QC.rds"))
+        file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_anno_QC.rds"))
 ```
 
 2. Normalize Data and Find Variable Genes. 
@@ -193,7 +197,7 @@ UMAP3 <- DimPlot(
 UMAP3
 
 png_res <- 1200
-png(filename = "//Users/leirealonso/Documents/ST/Project_Garvan_institute/Human_Breast_Cancer_Atlas/hard_vs_soft_cover/for_manuscripts/analysis/results_LA/UMAP3.png", width = 12*png_res, height = 8*png_res, res = png_res);print(UMAP3);dev.off()
+png(filename = file.path(res_dir, "UMAP3.png"), width = 12*png_res, height = 8*png_res, res = png_res);print(UMAP3);dev.off()
 ```
 
 ```{r}
@@ -211,12 +215,12 @@ KRT5_plot <- MapFeatures(vis_mod_norm,
             slot = "counts")
 
 png_res <- 1200
-png(filename = "/my_path/KRT5_plot_on_scaled_data.png", width = 15*png_res, height = 8*png_res, res = png_res);print(KRT5_plot);dev.off()
+png(filename = file.path(res_dir, "KRT5_plot_on_scaled_data.png"), width = 15*png_res, height = 8*png_res, res = png_res);print(KRT5_plot);dev.off()
 ```
 
 ```{r}
 #### Save object
 saveRDS(vis_mod_norm,
-        file = paste0("/my_path/", "vis_mod_norm.rds"))
+        file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_norm.rds"))
 ```
 

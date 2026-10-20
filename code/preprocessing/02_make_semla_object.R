@@ -3,8 +3,8 @@
 
 # --- Activate the renv
 # To run interactively - activate r-conda environment first, then radian in terminal
-project_dir = getwd()
-renv_dir = file.path(project_dir, "environment/semla")
+project_dir = getwd()  # run from the repo root
+renv_dir = file.path(project_dir, "environment")
 renv::load(renv_dir)
 
 # --- Load packages
@@ -18,20 +18,20 @@ library(semla)
 # Also translated the spot coordinates to fit these images
 # Make a new object from scratch containing the cropped images
 
-data_root_directory <- file.path(project_dir, "data/processed/spaceranger_outs", "*")
-cropped_dir <- file.path(project_dir, "results/misc/crop_images/per_sample", "*")
+data_root_directory <- file.path(project_dir, "data/spaceranger/paired", "*")
+cropped_dir <- file.path(project_dir, "data/analysis/paired/crop_images", "*")
 
 # List directories at the top level only
-all_dirs <- list.dirs(path = file.path(project_dir, "results/misc/crop_images/per_sample"), full.names = TRUE, recursive = FALSE)
+all_dirs <- list.dirs(path = file.path(project_dir, "data/analysis/paired/crop_images"), full.names = TRUE, recursive = FALSE)
 
 # Remove the parent directory (if you want to exclude it)
-directories <- all_dirs[all_dirs != file.path(project_dir, "results/misc/crop_images/per_sample")]
+directories <- all_dirs[all_dirs != file.path(project_dir, "data/analysis/paired/crop_images")]
 
 # Extract the names of the directories (correspond to the sample ids)
 sample_id_list <- basename(directories)
 
 # Get the required info
-samples <- Sys.glob(paths = file.path(data_root_directory, "outs",
+samples <- Sys.glob(paths = file.path(data_root_directory,
                                       "filtered_feature_bc_matrix.h5"))
 
 imgs <- Sys.glob(paths = file.path(cropped_dir, 
@@ -40,7 +40,7 @@ imgs <- Sys.glob(paths = file.path(cropped_dir,
 spotfiles <- Sys.glob(paths = file.path(cropped_dir, 
                                         "tissue_positions_shifted.csv"))
 
-json <- Sys.glob(paths = file.path(data_root_directory, "outs",
+json <- Sys.glob(paths = file.path(data_root_directory,
                                    "spatial", "scalefactors_json.json"))
 
 # Put everything into infotable
@@ -60,7 +60,7 @@ se <- LoadImages(se)
 
 # --- Make some plots to check
 
-out_dir_plots <- file.path(project_dir, "results/misc/crop_images/plots_to_check")
+out_dir_plots <- file.path(project_dir, "results/preprocessing/crop_images_check")
 dir.create(out_dir_plots, recursive = TRUE, showWarnings = FALSE)
 
 pdf(file.path(out_dir_plots, "images_in_object.pdf"), width = , height = 5)
@@ -77,7 +77,7 @@ dev.off()
 
 # --- Save the object
 
-out_dir <- file.path(project_dir, "data/processed/semla_objects")
+out_dir <- file.path(project_dir, "data/r_objects/paired")
 filename <- "all_samples_cropped_img.rds"
 
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)

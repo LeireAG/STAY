@@ -1,6 +1,11 @@
 ```{r}
-dyn.load("/home/m.abreumachado/apps/hdf5/lib/libhdf5_hl.so.200")
+# If the hdf5 shared library is not found, load it from your local install, e.g.:
+# dyn.load("/path/to/hdf5/lib/libhdf5_hl.so.200")
 library(semla)
+# Repo root, relative to this notebook (knitr runs chunks from the notebook's folder)
+project_dir <- normalizePath(file.path("..", "..", ".."))
+res_dir <- file.path(project_dir, "results", "figure_7")
+dir.create(file.path(res_dir, "map"), recursive = TRUE, showWarnings = FALSE)
 library(Seurat)
 library(patchwork)
 library(singlet)
@@ -14,8 +19,8 @@ library(heatmap3)
 
 ```{r}
 # load Garvan atlas
-garvan <- readRDS("/your_path/miniatlas.rds")
-merged <- readRDS("/your_path/vis_mod_nmf.rds")## your merged object with multiple samples 
+garvan <- readRDS(file.path(project_dir, "data", "r_objects", "paired", "miniatlas.rds"))
+merged <- readRDS(file.path(project_dir, "data", "r_objects", "paired", "vis_mod_nmf.rds"))## your merged object with multiple samples 
 samples <- unique(merged$sample_id)
 
 # ref steps 
@@ -58,7 +63,7 @@ for (sample in samples) {
 
 # Merge non-HD sample plots into a final plot
 final_plot <- patchwork::wrap_plots(sample_plots, ncol = 1)
-ggsave(paste0("/your_path/", "map/", "garvan_major_map.jpg"), final_plot, height = 35, width = 25, dpi = 300, limitsize = FALSE)
+ggsave(file.path(res_dir, "map", "garvan_major_map.jpg"), final_plot, height = 35, width = 25, dpi = 300, limitsize = FALSE)
 ```
 
 ### run minor cell types 
@@ -98,7 +103,7 @@ for (sample in samples) {
 
 # Merge non-HD sample plots into a final plot
 final_plot <- patchwork::wrap_plots(sample_plots, ncol = 1)
-ggsave(paste0("/your_path/", "map/", "garvan_minor_map.jpg"), final_plot, height = 35, width = 120, dpi = 300, limitsize = FALSE)
+ggsave(file.path(res_dir, "map", "garvan_minor_map.jpg"), final_plot, height = 35, width = 120, dpi = 300, limitsize = FALSE)
 ```
 
 ### merge 
@@ -109,7 +114,7 @@ merged <- MergeSTData(spls[[1]], spls[-1], merge_dr = "nmf")
 ```{r}
 features <- paste0("NMF_", 1:24)
 ggsave(
-    "/your_path/map/nmf.jpg",
+    file.path(res_dir, "map", "nmf.jpg"),
     plot = MapFeatures(merged, features = features, colors = viridis::turbo(11), label_by = "sample_id", pt_size = pt_size, override_plot_dims = TRUE, scale = "shared", ncol = length(features))
     , height = 30, width = 60, dpi = 300, limitsize = FALSE
     )
@@ -127,7 +132,7 @@ nmf_matrix <- nmf_matrix[shared_rownames, , drop = FALSE]
 celltype_matrix <- celltype_matrix[shared_rownames, , drop = FALSE]
 correlation_matrix <- cor(nmf_matrix, celltype_matrix, method = "spearman")
 
-pdf("/your_path/nmf_minor_celltype_correlation.pdf", width = 10, height = 10)
+pdf(file.path(res_dir, "nmf_minor_celltype_correlation.pdf"), width = 10, height = 10)
     heatmap3(correlation_matrix, 
     margins = c(12, 10))
 dev.off()
@@ -135,6 +140,6 @@ dev.off()
 
 ### save merged object with deconvolutions 
 ```{r}
-saveRDS(merged, "/your_path/vis_mod_nmf_decon.rds")
+saveRDS(merged, file.path(project_dir, "data", "r_objects", "paired", "vis_mod_nmf_decon.rds"))
 ```
 
