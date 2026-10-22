@@ -21,22 +21,25 @@ results/             # figure outputs, created by the scripts
 
 Each data folder is split into the four cohorts:
 
-| Cohort | Description | Figures |
-|---|---|---|
-| `paired` | Paired STAY vs standard sections (4 in 6.5 x 6.5 mm, 4 in 11 x 11 mm capture areas) | 3, 6, 7 |
-| `lymph_node` | Lymph node sections | 8 |
-| `STAY` | STAY sections of the detachment analysis | 2 |
-| `standard` | Standard-protocol sections of the detachment analysis | 2 |
+| Cohort | Description | Sample IDs | Figures |
+|---|---|---|---|
+| `paired` | Paired STAY vs standard sections of 4 patients (4 in 6.5 x 6.5 mm, 4 in 11 x 11 mm capture areas) | `Patient_<n>_STAY`, `Patient_<n>_standard` | 3, 6, 7 |
+| `lymph_node` | Lymph node sections of 4 patients (Patient_1' ... Patient_4') | Visium slide ID, e.g. `V53M13-062_A1` | 8 |
+| `STAY` | STAY sections of the detachment analysis | `P01` ... `P32` (`P29_1`, `P29_2`) | 2 |
+| `standard` | Standard-protocol sections of the detachment analysis | `S01` ... `S20` | 2 |
 
-Data goes in `data/<type>/<cohort>/<sample_id>/`. Each of those cohort folders has a `README.md` with its expected layout and download source. The `STAY` and `standard` samples used in Figure 2 are listed in `resources/sample_list.csv`.
+Data goes in `data/<type>/<cohort>/<sample_id>/`. Each cohort folder has a `README.md` with its layout and download source. `resources/sample_list.csv` lists every sample with its cohort, patient ID and (STAY) subtype. The scripts read their samples from it.
 
 ## Data availability
 
-- **Processed data** (Space Ranger output, annotations, analysis results, Seurat objects): <PROCESSED_DATA_DOI>
+- **Processed data** (Space Ranger output, annotations, analysis results, Seurat objects): https://doi.org/10.5281/zenodo.23558413
 - **Raw data** (`data/raw_data/`: FASTQs, images, Loupe alignments): <RAW_DATA_ACCESSION>
-- **STAY cohort:** https://doi.org/10.6019/S-BIAD3080 and https://doi.org/10.5281/zenodo.18917100
+- **STAY cohort and lymph node:** https://doi.org/10.6019/S-BIAD3080 and https://doi.org/10.5281/zenodo.18917100
 
-The paired figure scripts only need the final object, `data/r_objects/paired/vis_mod_nmf_decon.rds`. It contains the pathology annotations, normalized data, NMF and deconvolution results.
+The final R objects are provided, so the figure scripts can run without redoing the preprocessing:
+
+- `data/r_objects/paired/paired_object.rds`: pathology annotations, normalized data, NMF and deconvolution.
+- `data/r_objects/lymph_node/lymph_node_object.rds`: QC-filtered lymph node object with Harmony and NMF.
 
 ## Setup
 
@@ -51,11 +54,11 @@ In R, load the environment with `renv::load("environment")` before running a not
 
 **Preprocessing (paired)**, in order, in `code/preprocessing/`:
 
-1. `01_calculate_crop_coords.py`: crops H&E images to the capture area and shifts the spot coordinates.
-2. `02_make_semla_object.R`: builds the semla object from the cropped images.
-3. `qupath_to_loupe.py`: converts QuPath annotations to spot-level CSVs (`--cohort`, default `paired`).
+1. `01_calculate_crop_coords.py`: crops H&E images to the capture area and shifts the spot coordinates. Its output is provided in `data/analysis/paired/`.
+2. `02_make_semla_object.R`: builds the semla object from the cropped images, with sections in `sample_list.csv` order.
+3. `qupath_to_loupe.py`: converts QuPath annotations to spot-level CSVs (`--cohort`, default `paired`). Its output is provided in `data/histopathology_annotation/`.
 4. `03_loading_reviewed_path_annotation copy.Rmd`: adds the pathology annotations (Figure 3 C/F, Figure 6 J/K, Supplementary Data 1).
-5. `04_QC_normalization_scaling.Rmd`: QC, normalization and scaling (Figure 6F).
+5. `04_QC_normalization_scaling.Rmd`: QC, normalization and scaling (Figure 6F). Run it on `paired_object.rds` to create `vis_mod_norm.rds`, which the Figure 6 notebook needs.
 
 **Figure 2 (STAY vs standard)**: settings are in `resources/detachment.yaml`.
 
@@ -76,6 +79,8 @@ python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial p
 | `figure_7/semla_deconvolution.rmd` | deconvolution used in Figure 7 |
 | `figure_7/cell_proportion_barplot_figure_7K.Rmd` | 7K |
 | `lymph_node_analysis.qmd` | 8 |
+
+`semla_deconvolution.rmd` also needs an external single-cell reference (`data/r_objects/paired/miniatlas.rds`), which is not included. Its results are already in `paired_object.rds`. `lymph_node_analysis.qmd` rebuilds `lymph_node_object.rds` from the Space Ranger output.
 
 Outputs go to `results/<figure>/`, and to `results/preprocessing/` for the preprocessing plots.
 

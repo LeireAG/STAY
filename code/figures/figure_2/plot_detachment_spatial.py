@@ -28,12 +28,11 @@ warnings.filterwarnings("ignore", message="Use `squidpy.pl.spatial_scatter`")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from plot_detachment_cohort import assign_detached
-from run_detachment_pipeline import MATRIX_NAME, cohort_dir, read_cytassist_coords, read_image, read_spots
+from run_detachment_pipeline import MATRIX_NAME, SAMPLES, cohort_dir, read_cytassist_coords, read_image, read_spots
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 CFG = yaml.safe_load((PROJECT_ROOT / "resources" / "detachment.yaml").read_text(encoding="utf-8"))
 
-SAMPLE_LIST = PROJECT_ROOT / CFG["paths"]["sample_list"]
 OUT_DIR = PROJECT_ROOT / CFG["paths"]["results"] / "detachment_spatial"
 
 ASSIGN_PALETTE = {"not detached": "#D0D0D0", "detached": "#C0392B"}
@@ -271,7 +270,7 @@ def plot_sample(sample_id: str, vmin: float, vmax: float, path_palette: dict[str
 def main() -> None:
     apply_style()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    sample_ids = pd.read_csv(SAMPLE_LIST)["sample_id"].astype(str).tolist()
+    sample_ids = SAMPLES["sample_id"].tolist()
     vmin, vmax = score_limits(sample_ids)
     path_palette = build_path_palette(sample_ids)
     for sample_id in sample_ids:

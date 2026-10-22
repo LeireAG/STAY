@@ -13,7 +13,7 @@ library(ggplot2)
 
 ```{r} 
 #Load data
-deconv <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_nmf_decon.rds"))
+deconv <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "paired_object.rds"))
 ```
 
 ```{r}
@@ -34,7 +34,7 @@ matSums <- rowSums(mat)
 matSums
 
 #selecting one sample
-spots <- rownames(deconv@meta.data[deconv$sample_id== "clinical_id_4_standard", ])
+spots <- rownames(deconv@meta.data[deconv$sample_id== "Patient_4_standard", ])
 # Get the unique patient_method for this section
 label1 <- unique(deconv@meta.data[spots, "patient_method"])
 label1
@@ -89,7 +89,7 @@ ggplot(df, aes(x = "Section", y = percentage, fill = cell_type)) +
 ```{r}
 # compute percentages for Section 2
 #check ids: deconv@meta.data$sample_id
-spots <- rownames(deconv@meta.data[deconv$sample_id== "clinical_id_4_STAY", ])
+spots <- rownames(deconv@meta.data[deconv$sample_id== "Patient_4_STAY", ])
 mat_section2 <- mat[, spots]
 # Get the unique patient_method for this section
 label2 <- unique(deconv@meta.data[spots, "patient_method"])
@@ -189,7 +189,7 @@ png(filename = file.path(res_dir, "Patient4_cell_proportions.png"), width = 7*pn
 
 ```{r}
 #selecting one sample
-spots <- rownames(deconv@meta.data[deconv$sample_id== "clinical_id_3_standard", ])
+spots <- rownames(deconv@meta.data[deconv$sample_id== "Patient_3_standard", ])
 # Get the unique patient_method for this section
 label1 <- unique(deconv@meta.data[spots, "patient_method"])
 label1
@@ -226,7 +226,7 @@ ggplot(df3, aes(x = "Section", y = percentage, fill = cell_type)) +
 
 ```{r}
 #selecting one sample
-spots <- rownames(deconv@meta.data[deconv$sample_id== "clinical_id_3_STAY", ])
+spots <- rownames(deconv@meta.data[deconv$sample_id== "Patient_3_STAY", ])
 # Get the unique patient_method for this section
 label2 <- unique(deconv@meta.data[spots, "patient_method"])
 label2

@@ -14,7 +14,7 @@ library(patchwork)
 
 ```{r}
 # Load data 
-vis_mod_norm <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_nmf_decon.rds"))
+vis_mod_norm <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "paired_object.rds"))
 # Normalization applies to gene expression values, not to the count of detected genes
 ```
 
@@ -76,8 +76,8 @@ pt2 <- ggplot(gene_attr, aes(x = standard_det_rate, y = STAY_det_rate)) +
 counts <- GetAssayData(vis_mod_norm, assay = "RNA3", slot = "counts")
 meta   <- vis_mod_norm@meta.data
 
-stay_spots <- rownames(meta)[meta$sample_id == "clinical_id_1_STAY"]
-std_spots  <- rownames(meta)[meta$sample_id == "clinical_id_1_standard"]
+stay_spots <- rownames(meta)[meta$sample_id == "Patient_1_STAY"]
+std_spots  <- rownames(meta)[meta$sample_id == "Patient_1_standard"]
 length(stay_spots)
 length(std_spots)
 
@@ -153,8 +153,8 @@ dev.off()
 
 
 ```{r}
-stay_spots <- rownames(meta)[meta$sample_id == "clinical_id_2_STAY"]
-std_spots  <- rownames(meta)[meta$sample_id == "clinical_id_2_standard"]
+stay_spots <- rownames(meta)[meta$sample_id == "Patient_2_STAY"]
+std_spots  <- rownames(meta)[meta$sample_id == "Patient_2_standard"]
 length(stay_spots)
 length(std_spots)
 
@@ -225,8 +225,8 @@ dev.off()
 ```
 
 ```{r}
-stay_spots <- rownames(meta)[meta$sample_id == "clinical_id_3_STAY"]
-std_spots  <- rownames(meta)[meta$sample_id == "clinical_id_3_standard"]
+stay_spots <- rownames(meta)[meta$sample_id == "Patient_3_STAY"]
+std_spots  <- rownames(meta)[meta$sample_id == "Patient_3_standard"]
 
 length(stay_spots)
 length(std_spots)
@@ -295,8 +295,8 @@ dev.off()
 ```
 
 ```{r}
-stay_spots <- rownames(meta)[meta$sample_id == "clinical_id_4_STAY"]
-std_spots  <- rownames(meta)[meta$sample_id == "clinical_id_4_standard"]
+stay_spots <- rownames(meta)[meta$sample_id == "Patient_4_STAY"]
+std_spots  <- rownames(meta)[meta$sample_id == "Patient_4_standard"]
 
 length(stay_spots)
 length(std_spots)

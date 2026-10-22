@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Score per-spot detachment from images and write CSVs.
 
-Reads resources/detachment.yaml. Uses the raw barcode set, drops empty-tissue spots,
-writes data/analysis/detachment_score/{sample_id}.csv with barcode and detachment_score.
+Reads resources/detachment.yaml and the STAY/standard rows of resources/sample_list.csv. Uses the raw barcode set, drops empty-tissue spots,
+writes data/analysis/{cohort}/detachment_score/{sample_id}.csv with barcode and detachment_score.
 
   python code/figures/figure_2/run_detachment_pipeline.py
 """
@@ -25,7 +25,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 CFG = yaml.safe_load((PROJECT_ROOT / "resources" / "detachment.yaml").read_text(encoding="utf-8"))
 
 SAMPLE_LIST = PROJECT_ROOT / CFG["paths"]["sample_list"]
-COHORT = pd.read_csv(SAMPLE_LIST, dtype=str).set_index("sample_id")["cohort"].to_dict()
+# Figure 2 compares the STAY and standard cohorts; sample_list.csv also lists the other cohorts
+SAMPLES = pd.read_csv(SAMPLE_LIST, dtype=str).query("cohort in ['STAY', 'standard']")
+COHORT = SAMPLES.set_index("sample_id")["cohort"].to_dict()
 
 MATRIX_NAME = "filtered_feature_bc_matrix.h5" if CFG["scoring"]["matrix"] == "filtered" else "raw_feature_bc_matrix.h5"
 PATCH_SIZE_CYTASSIST = int(CFG["scoring"]["patch_size_cytassist"])
@@ -168,8 +170,7 @@ def score_sample(sample_id: str) -> pd.DataFrame:
 
 
 def main() -> None:
-    samples = pd.read_csv(SAMPLE_LIST)
-    for sample_id in samples["sample_id"].astype(str):
+    for sample_id in SAMPLES["sample_id"]:
         out = score_sample(sample_id)
         out_dir = cohort_dir("detachment_score", sample_id)
         out_dir.mkdir(parents=True, exist_ok=True)

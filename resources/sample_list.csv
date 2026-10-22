@@ -1,54 +1,66 @@
-sample_id,cohort
-3558_3E_R1S,STAY
-3563_2D_R1S,STAY
-3585_1K_R1L,STAY
-3586_3A_R1L,STAY
-3921_1M_R1S,STAY
-3925_1K_R1S,STAY
-3930_2F_R1S,STAY
-3936_1R_R1S,STAY
-3938_3H_R1S,STAY
-3944_2H_Xe1_V,STAY
-3946_2P_Xe1_V,STAY
-3948_1E_R1S,STAY
-3958_1G_R1S,STAY
-3959_1R_R1S,STAY
-3962_3H_R1L,STAY
-3962_3H_Xe1_V,STAY
-4048_3A_Xe1_V,STAY
-4219_3G_R1S,STAY
-4246_3E_R1L,STAY
-4269_3M_R1S,STAY
-4312_2E_R1S,STAY
-4317_2H_R1S,STAY
-4319_1L_R1S,STAY
-4454_2L_R1S,STAY
-4455_1N_R1S,STAY
-4463_1Y_R1S,STAY
-4497-1_2K_Xe1_V,STAY
-4535_2J_R1S,STAY
-4725_2C_R1L,STAY
-4740_1I_R1S,STAY
-4744_1P_Xe1_V,STAY
-4754_1G_Xe1_V,STAY
-4847-1_1J_Xe1_V,STAY
-4262L_4H_R1S,standard
-4262R_5I_R1S,standard
-4268_2A_R1S,standard
-4268_2A_R2S,standard
-4268_2A_R3L,standard
-4304_2C_R1S,standard
-4304_2C_R2S,standard
-4318_2J_R1S,standard
-4318_2J_R2S,standard
-4335_3D_R1L_s2,standard
-4393_2H_R1S,standard
-4404-1_2B_R1S,standard
-4405_2L_R1S,standard
-4416_2G_R1S,standard
-4419_3F_R1S,standard
-4425_2L_R2S,standard
-4515_4L_R1L,standard
-4814_1H_R1L,standard
-4851_1D_R1L,standard
-4874_2A_R2S,standard
+sample_id,cohort,patient_id,subtype
+P01,STAY,P01,Luminal A
+P02,STAY,P02,Luminal A
+P03,STAY,P03,Luminal A
+P04,STAY,P04,Luminal A
+P05,STAY,P05,Luminal A
+P06,STAY,P06,Luminal A
+P07,STAY,P07,Luminal A
+P08,STAY,P08,Luminal B
+P09,STAY,P09,Luminal B
+P10,STAY,P10,Luminal B
+P11,STAY,P11,Luminal B
+P12,STAY,P12,Luminal B
+P13,STAY,P13,Luminal B
+P14,STAY,P14,Luminal B
+P15,STAY,P15,Luminal B
+P16,STAY,P16,Luminal B
+P17,STAY,P17,Luminal B (HER2+)
+P18,STAY,P18,Luminal B (HER2+)
+P19,STAY,P19,Luminal B (HER2+)
+P20,STAY,P20,Luminal B (HER2+)
+P21,STAY,P21,Luminal B (HER2+)
+P22,STAY,P22,HER2+
+P23,STAY,P23,HER2+
+P24,STAY,P24,HER2+
+P25,STAY,P25,HER2+
+P26,STAY,P26,TNBC
+P27,STAY,P27,TNBC
+P28,STAY,P28,TNBC
+P29_1,STAY,P29,TNBC
+P29_2,STAY,P29,TNBC
+P30,STAY,P30,TNBC
+P31,STAY,P31,TNBC
+P32,STAY,P32,TNBC
+S01,standard,S01,
+S02,standard,S02,
+S03,standard,S03,
+S04,standard,S04,
+S05,standard,S05,
+S06,standard,S06,
+S07,standard,S07,
+S08,standard,S08,
+S09,standard,S09,
+S10,standard,S10,
+S11,standard,S11,
+S12,standard,S12,
+S13,standard,S13,
+S14,standard,S14,
+S15,standard,S15,
+S16,standard,S16,
+S17,standard,S17,
+S18,standard,S18,
+S19,standard,S19,
+S20,standard,S20,
+Patient_1_STAY,paired,Patient_1,
+Patient_1_standard,paired,Patient_1,
+Patient_2_standard,paired,Patient_2,
+Patient_2_STAY,paired,Patient_2,
+Patient_3_standard,paired,Patient_3,
+Patient_3_STAY,paired,Patient_3,
+Patient_4_standard,paired,Patient_4,
+Patient_4_STAY,paired,Patient_4,
+V53M13-062_A1,lymph_node,Patient_1',
+V53M13-062_B1,lymph_node,Patient_2',
+V53M20-113_A1,lymph_node,Patient_3',
+V53U05-031_A1,lymph_node,Patient_4',

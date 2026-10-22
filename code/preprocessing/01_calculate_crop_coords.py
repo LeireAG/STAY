@@ -189,7 +189,7 @@ plt.suptitle(f'{sample_id} ({subtype}) - Spots on hires image before + after cro
 # --- Also shift the original tissue_positions coordinates
 # In case we want to make an object from scratch
 # Load original tissue_positions file
-spatial_dir = os.path.join(project_dir, 'data', 'spaceranger', 'paired', joined_id, 'spatial')
+spatial_dir = os.path.join(project_dir, 'data', 'spaceranger', 'paired', sample_id, 'spatial')
 tissue_positions_file = 'tissue_positions.csv'
 
 tissue_positions = pd.read_csv(os.path.join(spatial_dir, tissue_positions_file))
@@ -203,7 +203,7 @@ tissue_positions_shifted['pxl_col_in_fullres'] = tissue_positions['pxl_col_in_fu
 
 # --- Save the output
 
-out_dir = os.path.join(project_dir, 'data', 'analysis', 'paired', 'crop_images', sample_id)
+out_dir = os.path.join(project_dir, 'data', 'analysis', 'paired', sample_id)
 os.makedirs(out_dir, exist_ok=True)
 
 # -- Save the cropped image

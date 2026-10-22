@@ -1,10 +1,12 @@
 # Raw data: standard
 
-Standard-protocol cohort of the detachment analysis (Figure 2). Samples are listed in `resources/sample_list.csv`.
+Standard-protocol cohort of the detachment analysis (Figure 2).
 
 ## Layout
 
-`<sample_id>/` with `fastqs/`, `images/` (H&E, CytAssist) and `manual_alignment/` (Loupe alignment JSON).
+`<sample_id>/` with `fastqs/`, `images/` (`he_image/`, `cytassist_image/`) and `manual_alignment/` (Loupe alignment JSON).
+
+Sample IDs: `S01` ... `S20`. See `resources/sample_list.csv`.
 
 ## Source
 

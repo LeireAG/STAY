@@ -31,12 +31,11 @@ from scipy.sparse import csc_matrix
 from scipy.stats import mannwhitneyu
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from run_detachment_pipeline import MATRIX_NAME, cohort_dir
+from run_detachment_pipeline import MATRIX_NAME, SAMPLES, cohort_dir
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 CFG = yaml.safe_load((PROJECT_ROOT / "resources" / "detachment.yaml").read_text(encoding="utf-8"))
 
-SAMPLE_LIST = PROJECT_ROOT / CFG["paths"]["sample_list"]
 RESULTS_DIR = PROJECT_ROOT / CFG["paths"]["results"]
 COHORT_COLORS = CFG["colors"]["cohort"]
 COHORT_ORDER = ["standard", "STAY"]
@@ -188,7 +187,7 @@ def read_spot_metrics(sample_id: str, barcodes: pd.Series) -> pd.DataFrame:
 
 def load_summaries() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Per-sample and per-(sample, compartment) detachment/QC summaries."""
-    samples = pd.read_csv(SAMPLE_LIST)
+    samples = SAMPLES
     sample_rows = []
     comp_rows = []
     for _, row in samples.iterrows():

@@ -1,11 +1,13 @@
 # Space Ranger output: standard
 
-Standard-protocol cohort of the detachment analysis (Figure 2). Samples are listed in `resources/sample_list.csv`.
+Standard-protocol cohort of the detachment analysis (Figure 2).
 
 ## Layout
 
 `<sample_id>/` with the contents of the Space Ranger `outs/` folder (`filtered_feature_bc_matrix.h5`, `raw_feature_bc_matrix.h5`, `spatial/`, ...).
 
+Sample IDs: `S01` ... `S20`. See `resources/sample_list.csv`.
+
 ## Source
 
-- <PROCESSED_DATA_DOI>
+- https://doi.org/10.5281/zenodo.23558413

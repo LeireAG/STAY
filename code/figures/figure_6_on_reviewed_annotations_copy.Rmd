@@ -120,7 +120,7 @@ png(filename = file.path(res_dir, "UMI_counts_per_spot_large_samples_plot_purple
 
 ```{r}
 # Load data (new Seurat object modified by Sophie) with my added annotations
-vis_mod <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_nmf_decon.rds"))
+vis_mod <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "paired_object.rds"))
 ```
 
 This generates Figure 3 G1-G4. 

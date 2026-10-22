@@ -19,7 +19,7 @@ vis_mod <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", 
 
 ```{r}
 # Load data (Seurat object with corrected image size and path annotations) and filtered spots artifacts
-vis_mod <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "vis_mod_nmf_decon.rds"))
+vis_mod <- readRDS(file = file.path(project_dir, "data", "r_objects", "paired", "paired_object.rds"))
 ```
 
 1.QC

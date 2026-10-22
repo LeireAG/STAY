@@ -18,34 +18,26 @@ library(semla)
 # Also translated the spot coordinates to fit these images
 # Make a new object from scratch containing the cropped images
 
-data_root_directory <- file.path(project_dir, "data/spaceranger/paired", "*")
-cropped_dir <- file.path(project_dir, "data/analysis/paired/crop_images", "*")
+# Paired sections, in the order of resources/sample_list.csv (= section numbers 1-8 used in the later scripts)
+sample_list <- read.csv(file.path(project_dir, "resources", "sample_list.csv"))
+paired <- sample_list[sample_list$cohort == "paired", ]
+sample_id_list <- paired$sample_id
 
-# List directories at the top level only
-all_dirs <- list.dirs(path = file.path(project_dir, "data/analysis/paired/crop_images"), full.names = TRUE, recursive = FALSE)
-
-# Remove the parent directory (if you want to exclude it)
-directories <- all_dirs[all_dirs != file.path(project_dir, "data/analysis/paired/crop_images")]
-
-# Extract the names of the directories (correspond to the sample ids)
-sample_id_list <- basename(directories)
+spaceranger_dirs <- file.path(project_dir, "data/spaceranger/paired", sample_id_list)
+cropped_dirs <- file.path(project_dir, "data/analysis/paired", sample_id_list)
 
 # Get the required info
-samples <- Sys.glob(paths = file.path(data_root_directory,
-                                      "filtered_feature_bc_matrix.h5"))
+samples <- file.path(spaceranger_dirs, "filtered_feature_bc_matrix.h5")
+imgs <- file.path(cropped_dirs, "tissue_hires_image.png")
+spotfiles <- file.path(cropped_dirs, "tissue_positions_shifted.csv")
+json <- file.path(spaceranger_dirs, "spatial", "scalefactors_json.json")
 
-imgs <- Sys.glob(paths = file.path(cropped_dir, 
-                                   "tissue_hires_image.png"))
-
-spotfiles <- Sys.glob(paths = file.path(cropped_dir, 
-                                        "tissue_positions_shifted.csv"))
-
-json <- Sys.glob(paths = file.path(data_root_directory,
-                                   "spatial", "scalefactors_json.json"))
-
-# Put everything into infotable
+# Put everything into infotable; extra columns become metadata (sample_id = Patient_<n>_<method>)
 infoTable <- tibble(samples, imgs, spotfiles, json, # Add required columns
-                    sample_id = sample_id_list) # Add additional column
+                    sample_id = sample_id_list,
+                    patient = paired$patient_id,
+                    method = sub(".*_", "", sample_id_list))
+infoTable$patient_method <- paste(infoTable$patient, infoTable$method, sep = "_")
 
 # Make seurat object
 se <- ReadVisiumData(infoTable)

@@ -4,8 +4,11 @@ Lymph node sections (Figure 8).
 
 ## Layout
 
-`<sample_id>/` with `fastqs/`, `images/` (H&E, CytAssist) and `manual_alignment/` (Loupe alignment JSON).
+`<sample_id>/` with `fastqs/` and `images/` (H&E, CytAssist).
+
+Sample IDs: Visium slide ID, e.g. `V53M13-062_A1` (Patient_1' ... Patient_4'). See `resources/sample_list.csv`.
 
 ## Source
 
-- <RAW_DATA_ACCESSION>
+- https://doi.org/10.6019/S-BIAD3080
+- https://doi.org/10.5281/zenodo.18917100

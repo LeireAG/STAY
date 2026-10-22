@@ -23,6 +23,8 @@ library(ggplot2)
 #create spatial object for all samples
 #define root directory
 visium_dir <- file.path(project_dir, "data", "spaceranger", "lymph_node")
+# Patient labels (Patient_1' ...) per Visium slide, from resources/sample_list.csv
+sample_list <- read.csv(file.path(project_dir, "resources", "sample_list.csv"))
 #Get the slide IDs
 slide_directories <- list.dirs( path = visium_dir, full.names = TRUE, recursive = FALSE )
 slide_id_list <- basename(slide_directories)
@@ -43,7 +45,8 @@ infoTable <- data.frame(
   imgs = imgs,
   spotfiles = spotfiles,
   json = json,
-  sample_id = sample_id_list,
+  slide_id = slide_id_list,
+  patient_id = sample_list$patient_id[match(slide_id_list, sample_list$patient_id)],
   stringsAsFactors = FALSE
 )
 
@@ -108,7 +111,7 @@ dev.off
 
 Vplot_genes <- VlnPlot(
   se,
-  group.by = "sample_id",
+  group.by = "patient_id",
   features = "nFeature_Spatial",
   #cols = "#FBB4AE"
 )
@@ -133,7 +136,7 @@ png(filename = file.path(res_dir, "unique_genes_Violin.png"), width = 10*png_res
 
 Vplot_UMI <- VlnPlot(
   se,
-  group.by = "sample_id",
+  group.by = "patient_id",
   features = "nCount_Spatial",
   #cols = "#FBB4AE"
 )
@@ -202,7 +205,7 @@ head(se$percent.plat) #The percentage is almost 0
 ```{r, fig.width = 15, fig.height = 8}
 #Plot as Violin
 feats <- c("nFeature_Spatial", "nCount_Spatial")
-QC_all_samples <- VlnPlot(se, group.by = "sample_id", features = feats, pt.size = 0.1, ncol = 2)
+QC_all_samples <- VlnPlot(se, group.by = "patient_id", features = feats, pt.size = 0.1, ncol = 2)
 QC_all_samples
 ```
 
@@ -233,7 +236,7 @@ summary(se@meta.data$nCount_Spatial)
 #per slide
 by(
   se@meta.data$nCount_Spatial,
-  se@meta.data$sample_id,
+  se@meta.data$patient_id,
   summary
 )
 
@@ -296,7 +299,7 @@ UMI_mito
 
 # Understand number of spots per patient with mito % > 16
 table(
-    se@meta.data$sample_id,
+    se@meta.data$patient_id,
     se@meta.data$percent.mito > 16
 )
 # I'd remove 246 spots, mostly affecting V53M20-113_A1 and, to a lesser extent, B1.
@@ -392,12 +395,12 @@ Reductions(se)
 
 DimPlot(se, 
         reduction = "pca", # plotting first two axes produced by PCA
-        group.by = "sample_id") + ggplot2::ggtitle("PC1 vs PC2") # Variability per sample
+        group.by = "patient_id") + ggplot2::ggtitle("PC1 vs PC2") # Variability per sample
 
 # UMAP generated from the original PCA
 p <- DimPlot(se, 
         reduction = "umap", # plotting UMAP embeddings 10 PCs in my case
-        group.by = "sample_id") + ggplot2::ggtitle("UMAP on PCA before harmony") 
+        group.by = "patient_id") + ggplot2::ggtitle("UMAP on PCA before harmony") 
 p
 # Variability per sample
 
@@ -412,7 +415,7 @@ library(harmony)
 # Harmony will create a new reduction rather than replacing your original PCA
 se <- RunHarmony(
   se,
-  group.by.vars = "sample_id", #problem here you're potentially asking it to remove patient-to-patient biological variation, not just technical variation
+  group.by.vars = "patient_id", #problem here you're potentially asking it to remove patient-to-patient biological variation, not just technical variation
   reduction = "pca", 
   reduction.save = "harmony" # Harmony stores its output as the "harmony" reduction. Then you run UMAP from that reduction.
 )
@@ -428,7 +431,7 @@ se <- RunUMAP(
 h <- DimPlot(
   se,
   reduction = "umap_harmony",
-  group.by = "sample_id"
+  group.by = "patient_id"
 ) +
   ggplot2::ggtitle("UMAP on after harmony")
 h
@@ -566,7 +569,7 @@ fea_results_nmf_6 |> select(p_value, term_size, query_size, intersection_size, t
 ```{r}
 # Save se_nmf object 
 out_dir <- file.path(project_dir, "data", "r_objects", "lymph_node")
-filename <- "lymph_nodes_nmf.rds"
+filename <- "lymph_node_object.rds"
 
 saveRDS(se_nmf, file.path(out_dir, filename))
 ```
@@ -594,12 +597,12 @@ ggsave(
 )
 
 # And for spatial plots
-# Extract sample_id from object
-sample_id_list <- unique(se_nmf$sample_id)
+# Extract patient IDs from object
+patient_list <- unique(se_nmf$patient_id)
 
-for (i in seq_along(sample_id_list)) {
+for (i in seq_along(patient_list)) {
 
-  sample_id <- sample_id_list[i]
+  patient <- patient_list[i]
 
   p <- MapFeatures(
     se_nmf,
@@ -615,7 +618,7 @@ for (i in seq_along(sample_id_list)) {
   ggsave(
     filename = file.path(
       output_dir,
-      paste0("NMF_spatial_factors_", sample_id, ".pdf")
+      paste0("NMF_spatial_factors_", patient, ".pdf")
     ),
     plot = p,
     width = 30,
@@ -629,17 +632,17 @@ for (i in seq_along(sample_id_list)) {
 
 ```{r}
 # Violin plots genes and counts per spot
-Idents(se) <- "sample_id"
+Idents(se) <- "patient_id"
 
 Vplot_genes <- VlnPlot(
   se,
   idents = c(
-    "V53M13-062_A1",
-    "V53M13-062_B1",
-    "V53M20-113_A1",
-    "V53U05-031_A1"
+    "Patient_1'",
+    "Patient_2'",
+    "Patient_3'",
+    "Patient_4'"
   ),
-  group.by = "sample_id",
+  group.by = "patient_id",
   features = "nFeature_Spatial", 
   fill.by = "ident",
   cols = c(
@@ -671,12 +674,12 @@ png(filename = file.path(res_dir, "unique_genes_Violin_selected_samples.png"), w
 Vplot_counts <- VlnPlot(
   se,
   idents = c(
-    "V53M13-062_A1",
-    "V53M13-062_B1",
-    "V53M20-113_A1",
-    "V53U05-031_A1"
+    "Patient_1'",
+    "Patient_2'",
+    "Patient_3'",
+    "Patient_4'"
   ),
-  group.by = "sample_id",
+  group.by = "patient_id",
   features = "nCount_Spatial", 
   fill.by = "ident",
   cols = c(

@@ -140,6 +140,6 @@ dev.off()
 
 ### save merged object with deconvolutions 
 ```{r}
-saveRDS(merged, file.path(project_dir, "data", "r_objects", "paired", "vis_mod_nmf_decon.rds"))
+saveRDS(merged, file.path(project_dir, "data", "r_objects", "paired", "paired_object.rds"))
 ```
 

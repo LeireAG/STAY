@@ -1,11 +1,13 @@
 # Intermediate analysis results: standard
 
-Standard-protocol cohort of the detachment analysis (Figure 2). Samples are listed in `resources/sample_list.csv`.
+Standard-protocol cohort of the detachment analysis (Figure 2).
 
 ## Layout
 
-One folder per analysis, e.g. `detachment_score/<sample_id>.csv` (STAY, standard) or `crop_images/<sample_id>/` (paired).
+`detachment_score/<sample_id>.csv`: per-spot detachment score (`barcode`, `detachment_score`), from `run_detachment_pipeline.py`.
+
+Sample IDs: `S01` ... `S20`. See `resources/sample_list.csv`.
 
 ## Source
 
-- <PROCESSED_DATA_DOI>
+- https://doi.org/10.5281/zenodo.23558413
