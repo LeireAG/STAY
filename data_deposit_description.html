@@ -1,0 +1,37 @@
+<p>Processed data (<a href="https://doi.org/10.5281/zenodo.23558413">https://doi.org/10.5281/zenodo.23558413</a>) for the STAY study: "Adapting spatial transcriptomics to FFPE tissue sections prepared with routine histology workflows in clinical settings".</p>
+
+<p>Code: <a href="https://github.com/LeireAG/STAY">https://github.com/LeireAG/STAY</a></p>
+
+<h2>Files</h2>
+
+<p>Each zip holds one data type for one cohort. Inside, paths start at the repository root (<code>data/&lt;type&gt;/&lt;cohort&gt;/...</code>).</p>
+
+<table>
+<thead>
+<tr><th>Zip</th><th>Contents</th></tr>
+</thead>
+<tbody>
+<tr><td><code>spaceranger_paired.zip</code></td><td>Space Ranger output, paired cohort</td></tr>
+<tr><td><code>spaceranger_standard.zip</code></td><td>Space Ranger output, standard cohort</td></tr>
+<tr><td><code>histopathology_annotation_paired.zip</code></td><td>QuPath annotations and spot-level annotations, paired cohort</td></tr>
+<tr><td><code>histopathology_annotation_standard.zip</code></td><td>QuPath annotations and spot-level epithelial annotations, standard cohort</td></tr>
+<tr><td><code>analysis_paired.zip</code></td><td>Cropped H&amp;E images and shifted spot coordinates, paired cohort</td></tr>
+<tr><td><code>analysis_STAY.zip</code></td><td>Per-spot detachment scores, STAY cohort</td></tr>
+<tr><td><code>analysis_standard.zip</code></td><td>Per-spot detachment scores, standard cohort</td></tr>
+<tr><td><code>r_objects_paired.zip</code></td><td><code>paired_object.rds</code>: final Seurat/semla object, paired cohort</td></tr>
+<tr><td><code>r_objects_lymph_node.zip</code></td><td><code>lymph_node_object.rds</code>: final Seurat/semla object, lymph node cohort</td></tr>
+</tbody>
+</table>
+
+<p>Raw data (<code>data/raw_data/</code>) is deposited separately: RAW_DATA_ACCESSION</p>
+
+<p>STAY cohort and lymph node data (raw data, Space Ranger output, annotations): <a href="https://doi.org/10.6019/S-BIAD3080">https://doi.org/10.6019/S-BIAD3080</a> and <a href="https://doi.org/10.5281/zenodo.18917100">https://doi.org/10.5281/zenodo.18917100</a></p>
+
+<h2>How to use</h2>
+
+<pre><code>git clone https://github.com/LeireAG/STAY STAY
+cd STAY
+# download the zips into this folder, then:
+for f in *.zip; do unzip -n "$f"; done</code></pre>
+
+<p>Every file lands in its correct <code>data/</code> folder. Then follow the repository README to set up the environments and run the analysis.</p>
