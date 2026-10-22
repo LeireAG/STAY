@@ -4,22 +4,17 @@
 
 <h2>Files</h2>
 
-<p>Each zip holds one data type for one cohort. Inside, paths start at the repository root (<code>data/&lt;type&gt;/&lt;cohort&gt;/...</code>).</p>
+<p>One zip per data type. Each unzips to its own folder (e.g. <code>spaceranger/</code>), split into one subfolder per cohort and one per sample: <code>&lt;type&gt;/&lt;cohort&gt;/&lt;sample_id&gt;/</code>. The <code>README.md</code> in each cohort folder describes its contents. Sample IDs are listed in <code>resources/sample_list.csv</code> in the code repository.</p>
 
 <table>
 <thead>
-<tr><th>Zip</th><th>Contents</th></tr>
+<tr><th>Zip</th><th>Cohorts</th><th>Contents</th></tr>
 </thead>
 <tbody>
-<tr><td><code>spaceranger_paired.zip</code></td><td>Space Ranger output, paired cohort</td></tr>
-<tr><td><code>spaceranger_standard.zip</code></td><td>Space Ranger output, standard cohort</td></tr>
-<tr><td><code>histopathology_annotation_paired.zip</code></td><td>QuPath annotations and spot-level annotations, paired cohort</td></tr>
-<tr><td><code>histopathology_annotation_standard.zip</code></td><td>QuPath annotations and spot-level epithelial annotations, standard cohort</td></tr>
-<tr><td><code>analysis_paired.zip</code></td><td>Cropped H&amp;E images and shifted spot coordinates, paired cohort</td></tr>
-<tr><td><code>analysis_STAY.zip</code></td><td>Per-spot detachment scores, STAY cohort</td></tr>
-<tr><td><code>analysis_standard.zip</code></td><td>Per-spot detachment scores, standard cohort</td></tr>
-<tr><td><code>r_objects_paired.zip</code></td><td><code>paired_object.rds</code>: final Seurat/semla object, paired cohort</td></tr>
-<tr><td><code>r_objects_lymph_node.zip</code></td><td><code>lymph_node_object.rds</code>: final Seurat/semla object, lymph node cohort</td></tr>
+<tr><td><code>spaceranger.zip</code></td><td>paired, standard</td><td>Space Ranger output per sample</td></tr>
+<tr><td><code>histopathology_annotation.zip</code></td><td>paired, standard</td><td>QuPath annotations and spot-level annotations (CSV)</td></tr>
+<tr><td><code>analysis.zip</code></td><td>paired, STAY, standard</td><td>Cropped H&amp;E images and shifted spot coordinates (paired); per-spot detachment scores (STAY, standard)</td></tr>
+<tr><td><code>r_objects.zip</code></td><td>paired, lymph_node</td><td>Final Seurat/semla objects: <code>paired_object.rds</code>, <code>lymph_node_object.rds</code></td></tr>
 </tbody>
 </table>
 
@@ -30,8 +25,8 @@
 <h2>How to use</h2>
 
 <pre><code>git clone https://github.com/LeireAG/STAY STAY
-cd STAY
-# download the zips into this folder, then:
+cd STAY/data
+# download the zips into STAY/data, then:
 for f in *.zip; do unzip -n "$f"; done</code></pre>
 
-<p>Every file lands in its correct <code>data/</code> folder. Then follow the repository README to set up the environments and run the analysis.</p>
+<p>Each zip fills its matching folder in <code>data/</code> (<code>data/spaceranger/</code>, <code>data/r_objects/</code>, ...). Then follow the repository README to set up the environments and run the analysis.</p>
