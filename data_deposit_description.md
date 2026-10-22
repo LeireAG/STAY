@@ -1,6 +1,6 @@
 Processed data (https://doi.org/10.5281/zenodo.23558413) for the STAY study: "Adapting spatial transcriptomics to FFPE tissue sections prepared with routine histology workflows in clinical settings".
 
-Code: <GITHUB_URL>
+Code: https://github.com/LeireAG/STAY
 
 ## Files
 
@@ -25,7 +25,7 @@ STAY cohort and lymph node data (raw data, Space Ranger output, annotations): ht
 ## How to use
 
 ```bash
-git clone <GITHUB_URL> STAY
+git clone https://github.com/LeireAG/STAY STAY
 cd STAY
 # download the zips into this folder, then:
 for f in *.zip; do unzip -n "$f"; done
