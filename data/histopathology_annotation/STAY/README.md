@@ -10,5 +10,6 @@ Sample IDs: `P01` ... `P32` (`P29_1`, `P29_2`: two sections of P29). See `resour
 
 ## Source
 
+- https://doi.org/10.5281/zenodo.23558413 (this study's processed data)
 - https://doi.org/10.6019/S-BIAD3080
 - https://doi.org/10.5281/zenodo.18917100

@@ -10,5 +10,6 @@ Sample IDs: Visium slide ID, e.g. `V53M13-062_A1` (Patient_1' ... Patient_4'). S
 
 ## Source
 
+- https://doi.org/10.5281/zenodo.23558413 (this study's processed data)
 - https://doi.org/10.6019/S-BIAD3080
 - https://doi.org/10.5281/zenodo.18917100
