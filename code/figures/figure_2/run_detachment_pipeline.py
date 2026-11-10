@@ -2,7 +2,8 @@
 """Score per-spot detachment from images and write CSVs.
 
 Reads resources/detachment.yaml and the STAY/standard rows of resources/sample_list.csv. Uses the raw barcode set, drops empty-tissue spots,
-writes data/analysis/{cohort}/detachment_score/{sample_id}.csv with barcode and detachment_score.
+writes data/analysis/{cohort}/detachment_score/{sample_id}.csv with barcode, detachment_score and the raw H&E
+patch features he_r, he_g, he_b, he_brightness, he_ASM.
 
   python code/figures/figure_2/run_detachment_pipeline.py
 """
@@ -165,6 +166,7 @@ def score_sample(sample_id: str) -> pd.DataFrame:
         {
             "barcode": spots.loc[keep, "barcode"].to_numpy(),
             "detachment_score": scores.to_numpy(dtype=np.float32),
+            **{f"he_{col}": hires.loc[keep, col].to_numpy(dtype=np.float32) for col in hires.columns},
         }
     )
 

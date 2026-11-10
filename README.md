@@ -67,6 +67,7 @@ conda activate detachment-score
 python code/figures/figure_2/run_detachment_pipeline.py   # per-spot detachment scores
 python code/figures/figure_2/plot_detachment_cohort.py    # cohort plots and statistics
 python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial panels
+python code/figures/figure_2/compare_image_features.py    # H&E image features, STAY vs standard
 ```
 
 **Other figures**, in `code/figures/`:
