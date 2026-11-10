@@ -15,3 +15,5 @@ dependencies:
   - anndata
   - scikit-image
   - tifffile
+  - zarr
+  - imagecodecs

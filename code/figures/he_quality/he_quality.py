@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Basic image metrics of the paired STAY vs standard H&E images, over the whole picture.
+"""Basic image metrics of the paired STAY vs standard H&E images, over the whole picture, at one pixel size.
 
-For each paired section, reads data/raw_data/paired/<sample_id>/images/he_image/*.tif at its native resolution
-and computes, over all pixels (no tissue detection, no regions, no TIFF metadata):
+For each paired section, reads data/raw_data/paired/<sample_id>/images/he_image/*.tif, rescales it to TARGET_UM
+microns per pixel (the coarsest of the images, so images are only ever shrunk, by pixel averaging), and computes
+over all pixels:
   - intensity: brightness, RMS contrast, dynamic range (1st-99th percentile), entropy of the grey histogram
   - sharpness: variance of the Laplacian, Tenengrad (mean squared Sobel gradient)
   - texture: GLCM contrast, homogeneity, energy and correlation (grey levels binned to GLCM_LEVELS, distance 1,
     averaged over 4 directions)
   - colour: mean red, green, blue and saturation
 
-The whole picture includes the glass around the tissue, and images are compared at whatever resolution they were
-scanned at, so check height_px/width_px in he_quality_sections.csv before reading sharpness and texture.
+The standard images are too large to load whole (up to ~70 GB), so every image is read, rescaled and measured in
+horizontal bands and the metrics are summed over bands (GLCM pixel pairs across band borders are not counted).
 There are four patients with one section per protocol, so no p-values: the result is the STAY - standard
 difference per patient, and for metrics with a better direction, which protocol is better in how many patients.
 
@@ -31,6 +32,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tifffile
+import zarr
 from skimage.feature import graycomatrix, graycoprops
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -38,6 +40,22 @@ RAW_DIR = PROJECT_ROOT / "data" / "raw_data" / "paired"
 RESULTS_DIR = PROJECT_ROOT / "results" / "he_quality"
 SAMPLES = pd.read_csv(PROJECT_ROOT / "resources" / "sample_list.csv", dtype=str).query("cohort == 'paired'")
 
+# pixel size of each H&E image, from its TIFF tags
+METAFER_200300 = 3450 / 200300000 * 1e4  # XResolution 200300000/3450 px per cm
+METAFER_200400 = 3450 / 200400000 * 1e4  # XResolution 200400000/3450 px per cm
+QUPATH_EXPORT = 1e6 / 2259600  # XResolution 2259600/1000000 px per unit, ImageJ unit=um
+MICRONS_PER_PIXEL = {
+    "Patient_1_STAY": METAFER_200300,
+    "Patient_1_standard": METAFER_200300,
+    "Patient_2_STAY": QUPATH_EXPORT,
+    "Patient_2_standard": METAFER_200400,
+    "Patient_3_STAY": QUPATH_EXPORT,
+    "Patient_3_standard": METAFER_200400,
+    "Patient_4_STAY": QUPATH_EXPORT,
+    "Patient_4_standard": METAFER_200300,
+}
+TARGET_UM = max(MICRONS_PER_PIXEL.values())
+BAND_ROWS = 1024  # output rows per band
 GLCM_LEVELS = 32
 # per patient, a difference smaller than this fraction of the pair's mean counts as a tie
 TIE = 0.05
@@ -62,49 +80,80 @@ METRICS = {
 }
 
 
-def read_he(sample_id: str) -> tuple[np.ndarray, str]:
+def open_he(sample_id: str) -> tuple[zarr.Array, str]:
+    """Full-resolution H&E image as a lazily read (rows, cols, RGB) array."""
     path = sorted((RAW_DIR / sample_id / "images" / "he_image").glob("*.tif*"))[0]
-    img = np.squeeze(tifffile.imread(path))
-    if img.ndim == 3 and img.shape[0] in (3, 4) and img.shape[-1] not in (3, 4):
-        img = np.moveaxis(img, 0, -1)
-    if img.ndim != 3:
-        raise SystemExit(f"{sample_id}: expected an RGB image, got shape {img.shape}")
-    img = np.ascontiguousarray(img[..., :3])
-    if img.dtype != np.uint8:
-        img = (img.astype(np.float32) / img.max() * 255).astype(np.uint8)
-    return img, path.name
+    arr = zarr.open(tifffile.imread(path, aszarr=True), mode="r")
+    if isinstance(arr, zarr.Group):  # pyramidal file: level 0 is full resolution
+        arr = arr["0"]
+    if arr.ndim != 3 or arr.shape[-1] < 3 or arr.dtype != np.uint8:
+        raise SystemExit(f"{sample_id}: expected an 8-bit RGB image, got {arr.shape} {arr.dtype}")
+    return arr, path.name
 
 
-def image_metrics(img: np.ndarray) -> dict:
-    gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    hist = np.bincount(gray.ravel(), minlength=256) / gray.size
-    p1, p99 = np.percentile(gray, [1, 99])
-    gx = cv2.Sobel(gray, cv2.CV_32F, 1, 0)
-    gy = cv2.Sobel(gray, cv2.CV_32F, 0, 1)
-    tenengrad = float(np.mean(np.square(gx, out=gx), dtype=np.float64) + np.mean(np.square(gy, out=gy), dtype=np.float64))
-    del gx, gy
-    glcm = graycomatrix(
-        (gray // (256 // GLCM_LEVELS)).astype(np.uint8),
-        distances=[1],
-        angles=[0, np.pi / 4, np.pi / 2, 3 * np.pi / 4],
-        levels=GLCM_LEVELS,
-        symmetric=True,
-        normed=True,
-    )
+def rescaled_bands(arr: zarr.Array, scale: float):
+    """Yield the image rescaled by scale (<= 1), BAND_ROWS output rows at a time."""
+    height, width = arr.shape[:2]
+    if arr.chunks[0] >= height:  # stored as one block (the uncompressed QuPath exports): read it once
+        arr = arr[:]
+    out_h, out_w = round(height * scale), round(width * scale)
+    for o0 in range(0, out_h, BAND_ROWS):
+        o1 = min(o0 + BAND_ROWS, out_h)
+        src = np.asarray(arr[round(o0 / scale) : min(height, round(o1 / scale)), :, :3])
+        yield src if scale == 1 else cv2.resize(src, (out_w, o1 - o0), interpolation=cv2.INTER_AREA)
+
+
+def image_metrics(bands) -> dict:
+    hist = np.zeros(256)
+    glcm = np.zeros((GLCM_LEVELS, GLCM_LEVELS, 1, 4))
+    rgb = np.zeros(3)
+    lap_sum = lap_sq = grad_sq = sat = 0.0
+    n = n_filtered = height = width = 0
+    carry = None
+    for band in bands:
+        gray = cv2.cvtColor(band, cv2.COLOR_RGB2GRAY)
+        hist += cv2.calcHist([gray], [0], None, [256], [0, 256]).ravel()
+        # 3x3 filters need the rows above and below: prepend the previous band's last two rows and keep only
+        # rows with both neighbours, so every row except the image's first and last is filtered exactly once
+        ext = gray if carry is None else np.vstack([carry, gray])
+        carry = gray[-2:]
+        lap = cv2.Laplacian(ext, cv2.CV_64F)[1:-1]
+        lap_sum += lap.sum()
+        lap_sq += np.square(lap).sum()
+        grad_sq += np.square(cv2.Sobel(ext, cv2.CV_64F, 1, 0)[1:-1]).sum() + np.square(cv2.Sobel(ext, cv2.CV_64F, 0, 1)[1:-1]).sum()
+        n_filtered += lap.size
+        glcm += graycomatrix(
+            (gray // (256 // GLCM_LEVELS)).astype(np.uint8),
+            distances=[1],
+            angles=[0, np.pi / 4, np.pi / 2, 3 * np.pi / 4],
+            levels=GLCM_LEVELS,
+            symmetric=True,
+        )
+        rgb += band.reshape(-1, 3).sum(axis=0, dtype=np.float64)
+        sat += cv2.cvtColor(band, cv2.COLOR_RGB2HSV)[..., 1].sum(dtype=np.float64)
+        n += gray.size
+        height += band.shape[0]
+        width = band.shape[1]
+
+    p = hist / n
+    levels = np.arange(256)
+    mean = (levels * p).sum()
+    cdf = np.cumsum(p)
+    glcm /= glcm.sum(axis=(0, 1), keepdims=True)
     return {
-        "height_px": img.shape[0],
-        "width_px": img.shape[1],
-        "brightness": float(gray.mean()),
-        "rms_contrast": float(gray.std()),
-        "dynamic_range": float(p99 - p1),
-        "entropy": float(-(hist[hist > 0] * np.log2(hist[hist > 0])).sum()),
-        "laplacian_var": float(cv2.Laplacian(gray, cv2.CV_32F).var(dtype=np.float64)),
-        "tenengrad": tenengrad,
-        **{f"glcm_{p}": float(graycoprops(glcm, p).mean()) for p in ["contrast", "homogeneity", "energy", "correlation"]},
-        "mean_red": float(img[..., 0].mean()),
-        "mean_green": float(img[..., 1].mean()),
-        "mean_blue": float(img[..., 2].mean()),
-        "saturation": float(cv2.cvtColor(img, cv2.COLOR_RGB2HSV)[..., 1].mean()),
+        "height_px": height,
+        "width_px": width,
+        "brightness": float(mean),
+        "rms_contrast": float(np.sqrt((levels**2 * p).sum() - mean**2)),
+        "dynamic_range": float(np.searchsorted(cdf, 0.99) - np.searchsorted(cdf, 0.01)),
+        "entropy": float(-(p[p > 0] * np.log2(p[p > 0])).sum()),
+        "laplacian_var": float(lap_sq / n_filtered - (lap_sum / n_filtered) ** 2),
+        "tenengrad": float(grad_sq / n_filtered),
+        **{f"glcm_{prop}": float(graycoprops(glcm, prop).mean()) for prop in ["contrast", "homogeneity", "energy", "correlation"]},
+        "mean_red": float(rgb[0] / n),
+        "mean_green": float(rgb[1] / n),
+        "mean_blue": float(rgb[2] / n),
+        "saturation": float(sat / n),
     }
 
 
@@ -149,6 +198,7 @@ def plot_sections(sections: pd.DataFrame, pairs: pd.DataFrame) -> None:
     for ax in axes.ravel()[len(METRICS) :]:
         ax.axis("off")
     axes[0, 0].legend(frameon=False, fontsize=6)
+    fig.suptitle(f"Whole H&E image at {TARGET_UM:.3f} µm/px", fontsize=8)
     fig.tight_layout()
     for ext in ["pdf", "png"]:
         fig.savefig(RESULTS_DIR / f"he_quality.{ext}", bbox_inches="tight", dpi=300)
@@ -162,11 +212,12 @@ def main() -> None:
     rows = []
     for _, row in SAMPLES.iterrows():
         sample_id = str(row["sample_id"])
-        img, name = read_he(sample_id)
-        print(f"{sample_id}: {name} {img.shape[1]}x{img.shape[0]} px", flush=True)
-        rows.append({"sample_id": sample_id, "patient_id": str(row["patient_id"]),
-                     "method": sample_id.rsplit("_", 1)[1], "file": name, **image_metrics(img)})
-        del img
+        arr, name = open_he(sample_id)
+        um = MICRONS_PER_PIXEL[sample_id]
+        print(f"{sample_id}: {name} {arr.shape[1]}x{arr.shape[0]} px at {um:.4f} um/px -> {TARGET_UM:.4f} um/px", flush=True)
+        metrics = image_metrics(rescaled_bands(arr, um / TARGET_UM))
+        rows.append({"sample_id": sample_id, "patient_id": str(row["patient_id"]), "method": sample_id.rsplit("_", 1)[1],
+                     "file": name, "um_per_px_original": um, "um_per_px": TARGET_UM, **metrics})
     sections = pd.DataFrame(rows)
     pairs = compare_pairs(sections)
 
