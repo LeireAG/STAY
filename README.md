@@ -69,7 +69,7 @@ python code/figures/figure_2/plot_detachment_cohort.py    # cohort plots and sta
 python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial panels
 ```
 
-**H&E image quality (paired STAY vs standard)**: compares the raw H&E images of the four paired patients (sharpness, contrast, staining, folds, white space, debris), without spots. Set pixel sizes in `MICRONS_PER_PIXEL` at the top of the script if the TIFF tags lack them.
+**H&E image quality (paired STAY vs standard)**: basic metrics (contrast, entropy, sharpness, GLCM texture, colour) over the whole raw H&E image of each paired section, at native resolution.
 
 ```bash
 conda activate detachment-score
