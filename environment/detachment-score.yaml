@@ -14,3 +14,4 @@ dependencies:
   - scanpy
   - anndata
   - scikit-image
+  - tifffile
