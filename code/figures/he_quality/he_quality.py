@@ -12,13 +12,8 @@ over all pixels:
 
 The standard images are too large to load whole (up to ~70 GB), so every image is read, rescaled and measured in
 horizontal bands and the metrics are summed over bands (GLCM pixel pairs across band borders are not counted).
-There are four patients with one section per protocol, so no p-values: the result is the STAY - standard
-difference per patient, and for metrics with a better direction, which protocol is better in how many patients.
 
-Writes to results/he_quality:
-  - he_quality_sections.csv: one row per section
-  - he_quality_paired.csv: per metric and patient, STAY - standard and which protocol is better
-  - he_quality.pdf/png: per-patient paired values of every metric
+Writes results/he_quality/he_quality_sections.csv (one row per section); plot_he_quality.py compares and plots it.
 
   python code/figures/he_quality/he_quality.py
 """
@@ -28,7 +23,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tifffile
@@ -57,27 +51,6 @@ MICRONS_PER_PIXEL = {
 TARGET_UM = max(MICRONS_PER_PIXEL.values())
 BAND_ROWS = 1024  # output rows per band
 GLCM_LEVELS = 32
-# per patient, a difference smaller than this fraction of the pair's mean counts as a tie
-TIE = 0.05
-
-METHODS = ["standard", "STAY"]
-# metric: (label, better direction: 1 higher is better, -1 lower is better, 0 no better direction)
-METRICS = {
-    "brightness": ("Brightness", 0),
-    "rms_contrast": ("RMS contrast", 1),
-    "dynamic_range": ("Dynamic range (p1-p99)", 1),
-    "entropy": ("Entropy (bits)", 1),
-    "laplacian_var": ("Sharpness: Laplacian variance", 1),
-    "tenengrad": ("Sharpness: Tenengrad", 1),
-    "glcm_contrast": ("GLCM contrast", 0),
-    "glcm_homogeneity": ("GLCM homogeneity", 0),
-    "glcm_energy": ("GLCM energy", 0),
-    "glcm_correlation": ("GLCM correlation", 0),
-    "mean_red": ("Mean red", 0),
-    "mean_green": ("Mean green", 0),
-    "mean_blue": ("Mean blue", 0),
-    "saturation": ("Mean saturation", 0),
-}
 
 
 def open_he(sample_id: str) -> tuple[zarr.Array, str]:
@@ -157,56 +130,7 @@ def image_metrics(bands) -> dict:
     }
 
 
-def compare_pairs(sections: pd.DataFrame) -> pd.DataFrame:
-    rows = []
-    for metric, (_, better) in METRICS.items():
-        wide = sections.pivot(index="patient_id", columns="method", values=metric)
-        for patient, row in wide.iterrows():
-            diff = row["STAY"] - row["standard"]
-            if better == 0 or not np.isfinite(diff):
-                winner = "-"
-            elif abs(diff) <= TIE * abs(row[METHODS].mean()):
-                winner = "tie"
-            else:
-                winner = "STAY" if np.sign(diff) == better else "standard"
-            rows.append({"metric": metric, "patient_id": patient, "standard": row["standard"], "STAY": row["STAY"],
-                         "STAY_minus_standard": diff, "better": winner})
-    return pd.DataFrame(rows)
-
-
-def verdict(better: pd.Series) -> str:
-    """How many patients each protocol is better in, e.g. "STAY 3, standard 0, tie 1"."""
-    if (better == "-").all():
-        return "no better direction"
-    return ", ".join(f"{k} {(better == k).sum()}" for k in ["STAY", "standard", "tie"])
-
-
-def plot_sections(sections: pd.DataFrame, pairs: pd.DataFrame) -> None:
-    ncol = 5
-    nrow = int(np.ceil(len(METRICS) / ncol))
-    fig, axes = plt.subplots(nrow, ncol, figsize=(2.2 * ncol, 2.3 * nrow), squeeze=False)
-    patients = sorted(sections["patient_id"].unique())
-    colors = dict(zip(patients, plt.get_cmap("tab10").colors))
-    for ax, (metric, (label, _)) in zip(axes.ravel(), METRICS.items()):
-        wide = sections.pivot(index="patient_id", columns="method", values=metric)
-        for patient, row in wide.iterrows():
-            ax.plot([0, 1], row[METHODS], "-o", color=colors[patient], ms=4, lw=1, label=patient)
-        ax.set_title(f"{label}\n{verdict(pairs.loc[pairs['metric'] == metric, 'better'])}")
-        ax.set_xticks([0, 1], METHODS)
-        ax.set_xlim(-0.3, 1.3)
-        ax.spines[["top", "right"]].set_visible(False)
-    for ax in axes.ravel()[len(METRICS) :]:
-        ax.axis("off")
-    axes[0, 0].legend(frameon=False, fontsize=6)
-    fig.suptitle(f"Whole H&E image at {TARGET_UM:.3f} µm/px", fontsize=8)
-    fig.tight_layout()
-    for ext in ["pdf", "png"]:
-        fig.savefig(RESULTS_DIR / f"he_quality.{ext}", bbox_inches="tight", dpi=300)
-    plt.close(fig)
-
-
 def main() -> None:
-    plt.rcParams.update({"font.size": 7, "axes.titlesize": 7, "pdf.fonttype": 42})
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     rows = []
@@ -218,19 +142,9 @@ def main() -> None:
         metrics = image_metrics(rescaled_bands(arr, um / TARGET_UM))
         rows.append({"sample_id": sample_id, "patient_id": str(row["patient_id"]), "method": sample_id.rsplit("_", 1)[1],
                      "file": name, "um_per_px_original": um, "um_per_px": TARGET_UM, **metrics})
-    sections = pd.DataFrame(rows)
-    pairs = compare_pairs(sections)
-
-    sections.to_csv(RESULTS_DIR / "he_quality_sections.csv", index=False)
-    pairs.to_csv(RESULTS_DIR / "he_quality_paired.csv", index=False)
-    plot_sections(sections, pairs)
-
-    summary = pairs.groupby("metric", sort=False).agg(
-        better_in=("better", verdict),
-        median_STAY_minus_standard=("STAY_minus_standard", "median"),
-    )
-    print(summary.to_string(), flush=True)
-    print(f"wrote {RESULTS_DIR}", flush=True)
+    out = RESULTS_DIR / "he_quality_sections.csv"
+    pd.DataFrame(rows).to_csv(out, index=False)
+    print(f"wrote {out}", flush=True)
 
 
 if __name__ == "__main__":

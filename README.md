@@ -73,7 +73,8 @@ python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial p
 
 ```bash
 conda activate detachment-score
-python code/figures/he_quality/he_quality.py
+python code/figures/he_quality/he_quality.py        # metrics per image (slow, needs the raw images)
+python code/figures/he_quality/plot_he_quality.py   # comparison and figure from the metrics CSV
 ```
 
 **Other figures**, in `code/figures/`:
