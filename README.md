@@ -69,6 +69,16 @@ python code/figures/figure_2/plot_detachment_cohort.py    # cohort plots and sta
 python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial panels
 ```
 
+**H&E image quality (paired STAY vs standard)**: basic metrics (contrast, entropy, sharpness, GLCM texture, colour) over the whole raw H&E image of each paired section, with every image rescaled to the coarsest pixel size (0.443 µm/px).
+
+```bash
+conda activate detachment-score
+python code/figures/he_quality/he_quality.py        # metrics per image (slow, needs the raw images)
+python code/figures/he_quality/plot_he_quality.py   # comparison and figure from the metrics CSV
+python code/figures/he_quality/he_crops.py           # thumbnails and crops (slow, needs the raw images)
+python code/figures/he_quality/plot_he_overview.py  # one figure with all sections and crops
+```
+
 **Other figures**, in `code/figures/`:
 
 | Script | Figure |
