@@ -30,7 +30,8 @@ SECTION_BAR_UM = 1000
 CROP_BAR_UM = 50
 ZOOM_BAR_UM = 10
 BOX_COLOR = "#0072B2"
-PNG_DPI = 900
+# resolution the section thumbnails are resampled to in the PDF and PNG (crops and zooms keep their own pixels)
+DPI = 900
 
 
 def apply_style() -> None:
@@ -111,8 +112,8 @@ def plot_all(crops: pd.DataFrame) -> None:
                 axes[0].text(-0.05, 0.5, patient.replace("_", " "), transform=axes[0].transAxes, rotation=90,
                              ha="right", va="center", fontsize=7)
 
-    fig.savefig(RESULTS_DIR / "he_images.pdf")
-    fig.savefig(RESULTS_DIR / "he_images.png", dpi=PNG_DPI)
+    for ext in ["pdf", "png"]:
+        fig.savefig(RESULTS_DIR / f"he_images.{ext}", dpi=DPI)
     plt.close(fig)
     print(f"wrote {RESULTS_DIR / 'he_images.pdf'}", flush=True)
 
