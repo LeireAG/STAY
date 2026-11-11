@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Single composite cohort figure for detachment and QC metrics.
 
-Outputs one PDF/PNG with:
-  - sample-level detachment rate by cohort
+Reads the manual detachment calls of run_detachment_pipeline.py. Tissue spots are Space Ranger's in_tissue spots
+plus detached spots outside that mask. Outputs one PDF/PNG with:
+  - sample-level detachment rate (detached / tissue spots) and annotated detached area by cohort
   - unique genes, UMI count, and % mitochondrial reads by cohort
   - detachment rate by epithelial vs non-epithelial compartment
   - sample counts shown on cohort x-axis labels
@@ -40,9 +41,6 @@ RESULTS_DIR = PROJECT_ROOT / CFG["paths"]["results"]
 COHORT_COLORS = CFG["colors"]["cohort"]
 COHORT_ORDER = ["standard", "STAY"]
 COHORT_LABELS = {"standard": "standard", "STAY": "STAY"}
-SCORE_THRES = float(CFG["scoring"]["score_thres"])
-SCORE_MAD_THRES = float(CFG["scoring"]["score_mad_thres"])
-MIN_SPOTS = int(CFG["scoring"]["min_spots"])
 
 BOXPLOT_STYLE = dict(
     patch_artist=True,
@@ -72,30 +70,6 @@ def apply_style() -> None:
             "figure.dpi": 150,
         }
     )
-
-
-def detachment_threshold(values: pd.Series) -> float:
-    if not len(values):
-        return np.nan
-    median = float(values.median())
-    mad = float(np.median(np.abs(values - median))) * 1.4826
-    return max(SCORE_THRES, median + SCORE_MAD_THRES * mad)
-
-
-def assign_detached(scores: pd.Series) -> pd.Series:
-    values = pd.to_numeric(scores, errors="coerce")
-    threshold = detachment_threshold(values.dropna())
-    called = (values >= threshold).fillna(False)
-    if int(called.sum()) < MIN_SPOTS:
-        return pd.Series(False, index=scores.index)
-    return called
-
-
-def call_rate(scores: pd.Series) -> tuple[float, float, int]:
-    values = pd.to_numeric(scores, errors="coerce").dropna()
-    n_high = int(assign_detached(scores).sum())
-    threshold = detachment_threshold(values)
-    return 100.0 * n_high / len(values), threshold, n_high
 
 
 def mannwhitney(a: pd.Series, b: pd.Series) -> dict:
@@ -185,28 +159,31 @@ def read_spot_metrics(sample_id: str, barcodes: pd.Series) -> pd.DataFrame:
     return df.loc[df["barcode"].isin(barcodes_str)].copy()
 
 
+def read_detached_area() -> pd.DataFrame:
+    paths = {PROJECT_ROOT / CFG["paths"]["detachment"].format(cohort=c) / "detached_area.csv" for c in SAMPLES["cohort"]}
+    return pd.concat([pd.read_csv(p, dtype={"sample_id": str}) for p in paths]).set_index("sample_id")
+
+
 def load_summaries() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Per-sample and per-(sample, compartment) detachment/QC summaries."""
-    samples = SAMPLES
+    areas = read_detached_area()
     sample_rows = []
     comp_rows = []
-    for _, row in samples.iterrows():
+    for _, row in SAMPLES.iterrows():
         sample_id = str(row["sample_id"])
         cohort = str(row["cohort"])
-        scores = pd.read_csv(cohort_dir("detachment_score", sample_id) / f"{sample_id}.csv")
-        scores["barcode"] = scores["barcode"].astype(str)
-        scores["detachment_score"] = pd.to_numeric(scores["detachment_score"], errors="coerce")
-        scores["detached"] = assign_detached(scores["detachment_score"])
-        rate, threshold, n_high = call_rate(scores["detachment_score"])
-        metrics = read_spot_metrics(sample_id, scores["barcode"])
+        calls = pd.read_csv(cohort_dir("detachment", sample_id) / f"{sample_id}.csv", dtype={"barcode": str})
+        tissue = calls.loc[calls["tissue"]]
+        n_detached = int(tissue["detached"].sum())
+        metrics = read_spot_metrics(sample_id, tissue["barcode"])
         sample_rows.append(
             {
                 "sample_id": sample_id,
                 "cohort": cohort,
-                "n_spots": int(scores["detachment_score"].notna().sum()),
-                "n_detached": n_high,
-                "detachment_rate_pct": rate,
-                "threshold": threshold,
+                "n_spots": len(tissue),
+                "n_detached": n_detached,
+                "detachment_rate_pct": 100.0 * n_detached / len(tissue),
+                "detached_area_mm2": float(areas.loc[sample_id, "detached_area_mm2"]),
                 "median_n_genes": float(metrics["n_genes"].median()),
                 "median_total_counts": float(metrics["total_counts"].median()),
                 "median_pct_mt": float(metrics["pct_mt"].median()),
@@ -217,11 +194,11 @@ def load_summaries() -> tuple[pd.DataFrame, pd.DataFrame]:
         if epi_path.exists():
             epi = pd.read_csv(epi_path)
             epi["barcode"] = epi["barcode"].astype(str)
-            epi = epi[epi["barcode"].isin(scores["barcode"])]
+            epi = epi[epi["barcode"].isin(tissue["barcode"])]
         else:
             epi = pd.DataFrame({"barcode": [], "annotation": []})
 
-        merged = scores[["barcode", "detached"]].merge(epi, on="barcode", how="left")
+        merged = tissue[["barcode", "detached"]].merge(epi, on="barcode", how="left")
         merged["compartment"] = np.where(merged["annotation"].notna(), "epithelial", "non-epithelial")
         for comp, sub in merged.groupby("compartment", sort=False):
             comp_rows.append(
@@ -252,6 +229,7 @@ def describe_stats(values: pd.Series) -> dict:
 def build_cohort_summary(per_sample: pd.DataFrame) -> pd.DataFrame:
     metrics = [
         "detachment_rate_pct",
+        "detached_area_mm2",
         "median_n_genes",
         "median_total_counts",
         "median_pct_mt",
@@ -378,10 +356,10 @@ def main() -> None:
     per_sample.to_csv(RESULTS_DIR / "detachment_per_sample_summary.csv", index=False)
     build_cohort_summary(per_sample).to_csv(RESULTS_DIR / "detachment_cohort_summary.csv", index=False)
 
-    fig = plt.figure(figsize=(8.6, 6.0))
+    fig = plt.figure(figsize=(10.6, 6.0))
     gs = GridSpec(
         2,
-        8,
+        10,
         figure=fig,
         height_ratios=[1.45, 1.0],
         hspace=0.58,
@@ -393,9 +371,10 @@ def main() -> None:
     )
 
     ax_rate = fig.add_subplot(gs[0, 0:2])
-    ax_genes = fig.add_subplot(gs[0, 2:4])
-    ax_umi = fig.add_subplot(gs[0, 4:6])
-    ax_mt = fig.add_subplot(gs[0, 6:8])
+    ax_area = fig.add_subplot(gs[0, 2:4])
+    ax_genes = fig.add_subplot(gs[0, 4:6])
+    ax_umi = fig.add_subplot(gs[0, 6:8])
+    ax_mt = fig.add_subplot(gs[0, 8:10])
     ax_comp = fig.add_subplot(gs[1, 0:3])
     comp_pos = ax_comp.get_position()
     ax_comp.set_position([comp_pos.x0, comp_pos.y0, comp_pos.width * 0.7, comp_pos.height])
@@ -407,6 +386,13 @@ def main() -> None:
         "Detached spots (%)",
         "Detachment rate",
         show_legend=True,
+    )
+    plot_cohort_panel(
+        ax_area,
+        summaries,
+        "detached_area_mm2",
+        "Detached area (mm²)",
+        "Detached area",
     )
     plot_cohort_panel(
         ax_genes,

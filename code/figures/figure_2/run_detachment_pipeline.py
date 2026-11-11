@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
-"""Score per-spot detachment from images and write CSVs.
+"""Per-spot detachment calls from the manual annotations made with annotate_detachment.py.
 
-Reads resources/detachment.yaml and the STAY/standard rows of resources/sample_list.csv. Uses the raw barcode set, drops empty-tissue spots,
-writes data/analysis/{cohort}/detachment_score/{sample_id}.csv with barcode and detachment_score.
+For each STAY and standard section in resources/sample_list.csv, fills the annotated polygons (CytAssist image
+pixels) into a mask and writes data/analysis/{cohort}/detachment/{sample_id}.csv with, per spot of the capture area:
+  - in_tissue: Space Ranger's tissue call
+  - detached: the spot centre (CytAssist coordinates from the Loupe alignment) is inside an annotated polygon
+  - tissue: in_tissue or detached, because Space Ranger's tissue mask can leave out detached tissue
+and data/analysis/{cohort}/detachment/detached_area.csv with one row per section: tissue and detached spot counts and
+the annotated area in mm2. Microns per CytAssist pixel come from the Visium spot pitch (SPOT_PITCH_UM between
+neighbouring spots of a row, which are two array columns apart).
 
   python code/figures/figure_2/run_detachment_pipeline.py
 """
@@ -13,11 +19,9 @@ import json
 from pathlib import Path
 
 import cv2
-import h5py
 import numpy as np
 import pandas as pd
 import yaml
-from skimage.feature import graycomatrix, graycoprops
 
 cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
 
@@ -29,11 +33,9 @@ SAMPLE_LIST = PROJECT_ROOT / CFG["paths"]["sample_list"]
 SAMPLES = pd.read_csv(SAMPLE_LIST, dtype=str).query("cohort in ['STAY', 'standard']")
 COHORT = SAMPLES.set_index("sample_id")["cohort"].to_dict()
 
-MATRIX_NAME = "filtered_feature_bc_matrix.h5" if CFG["scoring"]["matrix"] == "filtered" else "raw_feature_bc_matrix.h5"
-PATCH_SIZE_CYTASSIST = int(CFG["scoring"]["patch_size_cytassist"])
-PATCH_SIZE_HIRES = int(CFG["scoring"]["patch_size_hires"])
-EMPTY_TISSUE_EXPR = str(CFG["scoring"]["empty_tissue_expr"])
-DETACHMENT_SCORE_EXPR = str(CFG["scoring"]["detachment_score_expr"])
+# raw matrix: has every spot of the capture area, including detached ones outside Space Ranger's tissue mask
+MATRIX_NAME = "raw_feature_bc_matrix.h5"
+SPOT_PITCH_UM = 100.0  # Visium centre-to-centre distance of neighbouring spots
 
 
 def cohort_dir(key: str, sample_id: str) -> Path:
@@ -41,17 +43,13 @@ def cohort_dir(key: str, sample_id: str) -> Path:
     return PROJECT_ROOT / CFG["paths"][key].format(cohort=COHORT[sample_id])
 
 
-def read_barcodes(sample_dir: Path) -> list[str]:
-    with h5py.File(sample_dir / MATRIX_NAME, "r") as f:
-        raw = f["matrix/barcodes"][:]
-    return [x.decode() if isinstance(x, bytes) else str(x) for x in raw]
+def annotation_path(sample_id: str) -> Path:
+    return cohort_dir("detachment_annotation", sample_id) / f"{sample_id}.json"
 
 
 def read_spots(sample_dir: Path) -> pd.DataFrame:
-    tp = pd.read_csv(sample_dir / "spatial/tissue_positions.csv")
-    tp["barcode"] = tp["barcode"].astype(str)
-    keep = set(read_barcodes(sample_dir))
-    tp = tp.loc[tp["barcode"].isin(keep)].copy()
+    """All spots of the capture area with Space Ranger's tissue call and their position on the hires H&E."""
+    tp = pd.read_csv(sample_dir / "spatial/tissue_positions.csv", dtype={"barcode": str})
     with (sample_dir / "spatial/scalefactors_json.json").open() as handle:
         scale = float(json.load(handle)["tissue_hires_scalef"])
     tp["hires_x"] = pd.to_numeric(tp["pxl_col_in_fullres"]) * scale
@@ -60,6 +58,7 @@ def read_spots(sample_dir: Path) -> pd.DataFrame:
 
 
 def read_cytassist_coords(sample_id: str, spots: pd.DataFrame) -> pd.DataFrame:
+    """Adds each spot's position on the CytAssist image (cyt_x, cyt_y) from the Loupe alignment."""
     json_path = sorted((cohort_dir("raw", sample_id) / sample_id / "manual_alignment").glob("*.json"))[0]
     with json_path.open() as handle:
         oligo = json.load(handle)["oligo"]
@@ -79,104 +78,78 @@ def read_image(path: Path) -> np.ndarray:
     return img
 
 
-def patch_asm(gray: np.ndarray) -> float:
-    patch_q = (gray.astype(np.float32) / 16.0).astype(np.uint8)
-    glcm = graycomatrix(
-        patch_q,
-        distances=[1],
-        angles=[0, np.pi / 4, np.pi / 2, 3 * np.pi / 4],
-        levels=16,
-        symmetric=True,
-        normed=True,
-    )
-    return float(np.mean(graycoprops(glcm, "ASM")))
+def read_cytassist_image(sample_id: str) -> np.ndarray:
+    spatial = cohort_dir("spaceranger", sample_id) / sample_id / "spatial"
+    path = spatial / "cytassist_image.tiff"
+    return read_image(path if path.exists() else spatial / "cytassist_image.tif")
 
 
-def patch_stats(img: np.ndarray, xs, ys, patch_size: int, scale: float = 1.0, asm: bool = False) -> pd.DataFrame:
-    half_lo = patch_size // 2
-    half_hi = patch_size - half_lo
-    rows = []
-    for x, y in zip(xs, ys):
-        if not (np.isfinite(x) and np.isfinite(y)):
-            rows.append((0.0, 0.0, 0.0, 0.0, 0.0) if asm else (0.0, 0.0, 0.0, 0.0))
-            continue
-        ix, iy = int(x * scale), int(y * scale)
-        patch = img[iy - half_lo : iy + half_hi, ix - half_lo : ix + half_hi]
-        if patch.size == 0:
-            rows.append((0.0, 0.0, 0.0, 0.0, 0.0) if asm else (0.0, 0.0, 0.0, 0.0))
-            continue
-        med = np.median(patch, axis=(0, 1))
-        gray = patch if patch.ndim == 2 else cv2.cvtColor(patch, cv2.COLOR_RGB2GRAY)
-        brightness = float(np.mean(gray))
-        if asm:
-            rows.append((float(med[0]), float(med[1]), float(med[2]), brightness, patch_asm(gray)))
-        else:
-            rows.append((float(med[0]), float(med[1]), float(med[2]), brightness))
-    cols = ["r", "g", "b", "brightness"] + (["ASM"] if asm else [])
-    return pd.DataFrame(rows, columns=cols)
+def warp_image(img: np.ndarray, src_xy: np.ndarray, dst_xy: np.ndarray, out_shape: tuple[int, ...]) -> np.ndarray:
+    """Warp img onto another image through matching spot positions (affine fit, RANSAC)."""
+    valid = np.isfinite(src_xy).all(axis=1) & np.isfinite(dst_xy).all(axis=1)
+    M, _ = cv2.estimateAffine2D(np.float32(src_xy[valid]), np.float32(dst_xy[valid]), method=cv2.RANSAC,
+                                ransacReprojThreshold=5.0)
+    return cv2.warpAffine(img, M, (int(out_shape[1]), int(out_shape[0])), flags=cv2.INTER_LINEAR,
+                          borderValue=(255, 255, 255))
 
 
-def align_dynamic_range(source: pd.Series, target: pd.Series) -> pd.Series:
-    s_min, s_max = float(source.quantile(0.01)), float(source.quantile(0.99))
-    t_min, t_max = float(target.quantile(0.01)), float(target.quantile(0.99))
-    if s_max == s_min:
-        return source.copy()
-    return (source - s_min) / (s_max - s_min) * (t_max - t_min) + t_min
+def cytassist_um_per_px(spots: pd.DataFrame) -> float:
+    """Microns per CytAssist pixel: SPOT_PITCH_UM over the median distance between row neighbours."""
+    a = spots[["array_row", "array_col", "cyt_x", "cyt_y"]].dropna()
+    pairs = a.merge(a.assign(array_col=a["array_col"] - 2), on=["array_row", "array_col"], suffixes=("", "_next"))
+    distance = np.hypot(pairs["cyt_x_next"] - pairs["cyt_x"], pairs["cyt_y_next"] - pairs["cyt_y"])
+    return SPOT_PITCH_UM / float(distance.median())
 
 
-def score_sample(sample_id: str) -> pd.DataFrame:
+def detachment_calls(sample_id: str) -> tuple[pd.DataFrame, dict]:
     sample_dir = cohort_dir("spaceranger", sample_id) / sample_id
     spots = read_cytassist_coords(sample_id, read_spots(sample_dir))
+    height, width = read_cytassist_image(sample_id).shape[:2]
+    polygons = json.loads(annotation_path(sample_id).read_text())["polygons"]
 
-    spatial = sample_dir / "spatial"
-    cyt_path = spatial / "cytassist_image.tiff"
-    if not cyt_path.exists():
-        cyt_path = spatial / "cytassist_image.tif"
-    cyt_img = read_image(cyt_path)
-    hires_img = read_image(spatial / "tissue_hires_image.png")
+    mask = np.zeros((height, width), np.uint8)
+    if polygons:
+        cv2.fillPoly(mask, [np.round(np.asarray(p)).astype(np.int32) for p in polygons], 1)
+    x = spots["cyt_x"].round().to_numpy()
+    y = spots["cyt_y"].round().to_numpy()
+    on_image = np.isfinite(x) & np.isfinite(y) & (x >= 0) & (x < width) & (y >= 0) & (y < height)
+    detached = np.zeros(len(spots), bool)
+    detached[on_image] = mask[y[on_image].astype(int), x[on_image].astype(int)] == 1
 
-    cyt = patch_stats(cyt_img, spots["cyt_x"], spots["cyt_y"], PATCH_SIZE_CYTASSIST)
-    hires = patch_stats(hires_img, spots["hires_x"], spots["hires_y"], PATCH_SIZE_HIRES, asm=True)
-
-    valid = (cyt["brightness"] != 0) & (hires["brightness"] != 0)
-    hires = hires.copy()
-    hires.loc[~valid, :] = np.nan
-    cyt.loc[~valid, :] = np.nan
-
-    obs = pd.DataFrame(
-        {
-            "dr_cyt_r": align_dynamic_range(cyt["r"], hires["r"]),
-            "dr_cyt_g": align_dynamic_range(cyt["g"], hires["g"]),
-            "dr_cyt_b": align_dynamic_range(cyt["b"], hires["b"]),
-            "dr_hires_g": hires["g"],
-            "dr_hires_ASM": hires["ASM"],
-        }
-    )
-    obs["delta_g"] = obs["dr_cyt_g"] - obs["dr_hires_g"]
-
-    empty = obs.eval(EMPTY_TISSUE_EXPR).fillna(False).astype(bool)
-    keep = valid.to_numpy() & ~empty.to_numpy()
-
-    ns = {col: obs.loc[keep, col] for col in obs.columns}
-    ns["np"] = np
-    scores = pd.to_numeric(eval(DETACHMENT_SCORE_EXPR, ns), errors="coerce").replace([np.inf, -np.inf], np.nan)
-
-    return pd.DataFrame(
-        {
-            "barcode": spots.loc[keep, "barcode"].to_numpy(),
-            "detachment_score": scores.to_numpy(dtype=np.float32),
-        }
-    )
+    calls = pd.DataFrame({"barcode": spots["barcode"], "in_tissue": spots["in_tissue"].astype(bool),
+                          "detached": detached})
+    calls["tissue"] = calls["in_tissue"] | calls["detached"]
+    um = cytassist_um_per_px(spots)
+    area = {
+        "sample_id": sample_id,
+        "n_tissue_spots": int(calls["tissue"].sum()),
+        "n_detached_spots": int(calls["detached"].sum()),
+        "n_detached_spots_outside_tissue_mask": int((calls["detached"] & ~calls["in_tissue"]).sum()),
+        "detached_area_mm2": float(mask.sum()) * um**2 / 1e6,
+        "cytassist_um_per_px": um,
+    }
+    return calls, area
 
 
 def main() -> None:
+    missing = [s for s in SAMPLES["sample_id"] if not annotation_path(s).exists()]
+    if missing:
+        # counts only: listing sample IDs would unblind the annotation
+        raise SystemExit(f"{len(missing)} of {len(SAMPLES)} sections are not annotated yet; run annotate_detachment.py")
+
+    areas = []
     for sample_id in SAMPLES["sample_id"]:
-        out = score_sample(sample_id)
-        out_dir = cohort_dir("detachment_score", sample_id)
+        calls, area = detachment_calls(sample_id)
+        out_dir = cohort_dir("detachment", sample_id)
         out_dir.mkdir(parents=True, exist_ok=True)
-        path = out_dir / f"{sample_id}.csv"
-        out.to_csv(path, index=False)
-        print(f"wrote {path} ({len(out)} spots)", flush=True)
+        calls.to_csv(out_dir / f"{sample_id}.csv", index=False)
+        areas.append({**area, "cohort": COHORT[sample_id]})
+        print(f"{sample_id}: {area['n_detached_spots']} of {area['n_tissue_spots']} tissue spots detached, "
+              f"{area['detached_area_mm2']:.3f} mm2", flush=True)
+    for cohort, rows in pd.DataFrame(areas).groupby("cohort"):
+        path = PROJECT_ROOT / CFG["paths"]["detachment"].format(cohort=cohort) / "detached_area.csv"
+        rows.drop(columns="cohort").to_csv(path, index=False)
+        print(f"wrote {path}", flush=True)
 
 
 if __name__ == "__main__":

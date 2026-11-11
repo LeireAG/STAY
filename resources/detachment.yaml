@@ -3,20 +3,11 @@ paths:
   # {cohort} is filled from the cohort column of sample_list (STAY or standard)
   spaceranger: data/spaceranger/{cohort}
   raw: data/raw_data/{cohort}
-  detachment_score: data/analysis/{cohort}/detachment_score
+  # manual annotations (annotate_detachment.py) and the per-spot calls made from them (run_detachment_pipeline.py)
+  detachment_annotation: data/analysis/{cohort}/detachment_annotation
+  detachment: data/analysis/{cohort}/detachment
   histopathology_annotation: data/histopathology_annotation/{cohort}
   results: results/figure_2
-
-scoring:
-  matrix: raw
-  patch_size_cytassist: 40
-  patch_size_hires: 40
-  empty_tissue_expr: dr_hires_ASM > 0.9
-  detachment_score_expr: >-
-    delta_g * ((dr_cyt_r * dr_cyt_g * dr_cyt_b) / (256 ** 3))
-  score_thres: 25
-  score_mad_thres: 2
-  min_spots: 20
 
 colors:
   cohort:

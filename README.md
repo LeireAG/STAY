@@ -12,7 +12,7 @@ data/                # not tracked by git: download the data into the matching f
   raw_data/                    # FASTQs, H&E/CytAssist images, Loupe alignments
   spaceranger/                 # Space Ranger outs/ per sample
   histopathology_annotation/   # QuPath GeoJSON + spot-level CSVs
-  analysis/                    # intermediate results (detachment scores, cropped images)
+  analysis/                    # intermediate results (detachment annotations and calls, cropped images)
   r_objects/                   # Seurat/semla .rds objects
 environment/         # conda env (Python) and renv (R)
 resources/           # sample list and Figure 2 config
@@ -45,6 +45,7 @@ The final R objects are provided, so the figure scripts can run without redoing 
 
 ```bash
 conda env create -f environment/detachment-score.yaml    # Python (Figure 2)
+conda env create -f environment/detachment-annotation.yaml   # napari, for annotating detachment (Figure 2)
 Rscript -e 'renv::restore(project = "environment")'      # R packages
 ```
 
@@ -60,11 +61,13 @@ In R, load the environment with `renv::load("environment")` before running a not
 4. `03_loading_reviewed_path_annotation copy.Rmd`: adds the pathology annotations (Figure 3 C/F, Figure 6 J/K, Supplementary Data 1).
 5. `04_QC_normalization_scaling.Rmd`: QC, normalization and scaling (Figure 6F). Run it on `paired_object.rds` to create `vis_mod_norm.rds`, which the Figure 6 notebook needs.
 
-**Figure 2 (STAY vs standard)**: settings are in `resources/detachment.yaml`.
+**Figure 2 (STAY vs standard)**: detachment is annotated manually on the CytAssist images, blinded to sample and cohort; paths are in `resources/detachment.yaml`.
 
 ```bash
+conda activate detachment-annotation
+python code/figures/figure_2/annotate_detachment.py       # draw detached areas in napari (add --review to revisit)
 conda activate detachment-score
-python code/figures/figure_2/run_detachment_pipeline.py   # per-spot detachment scores
+python code/figures/figure_2/run_detachment_pipeline.py   # per-spot detachment calls and detached area
 python code/figures/figure_2/plot_detachment_cohort.py    # cohort plots and statistics
 python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial panels
 ```

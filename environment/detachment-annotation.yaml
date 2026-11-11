@@ -1,0 +1,12 @@
+name: detachment-annotation
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python=3.11
+  - numpy
+  - pandas
+  - pyyaml
+  - py-opencv
+  - napari
+  - pyqt

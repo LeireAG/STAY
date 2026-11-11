@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Per-sample spatial panels (PowerPoint-friendly 2x3).
 
-Row 1: H&E; CytAssist; pathology/epithelial annotation
-Row 2: detachment score; detachment assignment; unique genes
+Row 1: H&E; CytAssist (aligned to the H&E); pathology/epithelial annotation
+Row 2: CytAssist with the manually annotated detached areas; detached tissue spots; unique genes
 
   python code/figures/figure_2/plot_detachment_spatial.py
 """
@@ -27,8 +27,8 @@ cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
 warnings.filterwarnings("ignore", message="Use `squidpy.pl.spatial_scatter`")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from plot_detachment_cohort import assign_detached
-from run_detachment_pipeline import MATRIX_NAME, SAMPLES, cohort_dir, read_cytassist_coords, read_image, read_spots
+from run_detachment_pipeline import (MATRIX_NAME, SAMPLES, annotation_path, cohort_dir, read_cytassist_coords,
+                                     read_cytassist_image, read_image, read_spots, warp_image)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 CFG = yaml.safe_load((PROJECT_ROOT / "resources" / "detachment.yaml").read_text(encoding="utf-8"))
@@ -54,30 +54,6 @@ def apply_style() -> None:
             "figure.dpi": 150,
         }
     )
-
-
-def score_limits(sample_ids: list[str]) -> tuple[float, float]:
-    vals = []
-    for sample_id in sample_ids:
-        s = pd.to_numeric(pd.read_csv(cohort_dir("detachment_score", sample_id) / f"{sample_id}.csv")["detachment_score"], errors="coerce")
-        vals.append(s.dropna())
-    all_scores = pd.concat(vals, ignore_index=True)
-    return float(all_scores.quantile(0.01)), float(all_scores.quantile(0.99))
-
-
-def align_cytassist_to_hires(
-    cyt_img: np.ndarray, hires_xy: np.ndarray, cyt_xy: np.ndarray, out_shape: tuple[int, ...]
-) -> np.ndarray:
-    valid = np.isfinite(hires_xy).all(axis=1) & np.isfinite(cyt_xy).all(axis=1)
-    h, w = int(out_shape[0]), int(out_shape[1])
-    if int(valid.sum()) < 3:
-        return cyt_img
-    src = np.ascontiguousarray(cyt_xy[valid], dtype=np.float32)
-    dst = np.ascontiguousarray(hires_xy[valid], dtype=np.float32)
-    M, _ = cv2.estimateAffine2D(src, dst, method=cv2.RANSAC, ransacReprojThreshold=5.0)
-    if M is None:
-        return cyt_img
-    return cv2.warpAffine(cyt_img, M, (w, h), flags=cv2.INTER_LINEAR, borderValue=(0, 0, 0))
 
 
 def read_unique_genes(sample_id: str, barcodes: pd.Series) -> pd.Series:
@@ -121,53 +97,43 @@ def build_path_palette(sample_ids: list[str]) -> dict[str, str]:
     return palette
 
 
-def load_adata(sample_id: str) -> tuple[ad.AnnData, np.ndarray, np.ndarray]:
+def load_adata(sample_id: str) -> tuple[ad.AnnData, np.ndarray, np.ndarray, np.ndarray]:
     sample_dir = cohort_dir("spaceranger", sample_id) / sample_id
-    scores = pd.read_csv(cohort_dir("detachment_score", sample_id) / f"{sample_id}.csv")
-    scores["barcode"] = scores["barcode"].astype(str)
+    calls = pd.read_csv(cohort_dir("detachment", sample_id) / f"{sample_id}.csv", dtype={"barcode": str})
 
     spots = read_cytassist_coords(sample_id, read_spots(sample_dir))
-    spots["barcode"] = spots["barcode"].astype(str)
-    spots = spots.merge(scores, on="barcode", how="inner").set_index("barcode")
+    spots = spots.merge(calls.loc[calls["tissue"], ["barcode", "detached"]], on="barcode", how="inner")
+    spots = spots.set_index("barcode")
 
-    spots["detached"] = assign_detached(spots["detachment_score"])
     spots["detachment"] = pd.Categorical(
         np.where(spots["detached"], "detached", "not detached"),
         categories=["not detached", "detached"],
     )
-    spots["n_genes"] = read_unique_genes(sample_id, scores["barcode"]).reindex(spots.index).to_numpy(dtype=float)
-    spots["path_annotation"] = load_path_annotation(sample_id, scores["barcode"]).reindex(spots.index).to_numpy(dtype=str)
+    barcodes = spots.index.to_series()
+    spots["n_genes"] = read_unique_genes(sample_id, barcodes).reindex(spots.index).to_numpy(dtype=float)
+    spots["path_annotation"] = load_path_annotation(sample_id, barcodes).reindex(spots.index).to_numpy(dtype=str)
     spots["path_annotation"] = pd.Categorical(spots["path_annotation"], categories=sorted(spots["path_annotation"].unique().tolist()))
 
     spatial = sample_dir / "spatial"
-    cyt_path = spatial / "cytassist_image.tiff"
-    if not cyt_path.exists():
-        cyt_path = spatial / "cytassist_image.tif"
     hires = read_image(spatial / "tissue_hires_image.png")
-    cyt = read_image(cyt_path)
+    cyt = read_cytassist_image(sample_id)
 
     with (spatial / "scalefactors_json.json").open() as handle:
         scalefactors = json.load(handle)
-    scalefactors["tissue_cytassist_scalef"] = 1.0
 
-    hires_xy = np.column_stack(
-        [
-            spots["pxl_col_in_fullres"].to_numpy(dtype=float) * float(scalefactors["tissue_hires_scalef"]),
-            spots["pxl_row_in_fullres"].to_numpy(dtype=float) * float(scalefactors["tissue_hires_scalef"]),
-        ]
-    )
+    hires_xy = spots[["hires_x", "hires_y"]].to_numpy(dtype=float)
     cyt_xy = spots[["cyt_x", "cyt_y"]].to_numpy(dtype=float)
-    cyt_aligned = align_cytassist_to_hires(cyt, hires_xy, cyt_xy, hires.shape)
+    cyt_aligned = warp_image(cyt, cyt_xy, hires_xy, hires.shape)
 
-    adata = ad.AnnData(obs=spots[["detachment_score", "detachment", "path_annotation", "n_genes"]].copy())
+    adata = ad.AnnData(obs=spots[["detachment", "path_annotation", "n_genes"]].copy())
     adata.obsm["spatial"] = spots[["pxl_col_in_fullres", "pxl_row_in_fullres"]].to_numpy(dtype=float)
     adata.uns["spatial"] = {
         sample_id: {
-            "images": {"hires": hires, "cytassist": cyt_aligned},
+            "images": {"hires": hires},
             "scalefactors": scalefactors,
         }
     }
-    return adata, hires, cyt_aligned
+    return adata, hires, cyt_aligned, cyt
 
 
 def _clear_embedding_axes(ax) -> None:
@@ -179,9 +145,9 @@ def _clear_embedding_axes(ax) -> None:
         spine.set_visible(False)
 
 
-def plot_sample(sample_id: str, vmin: float, vmax: float, path_palette: dict[str, str]) -> None:
+def plot_sample(sample_id: str, path_palette: dict[str, str]) -> None:
     sc.settings.verbosity = 0
-    adata, hires, cyt = load_adata(sample_id)
+    adata, hires, cyt, cyt_raw = load_adata(sample_id)
     ng = pd.to_numeric(adata.obs["n_genes"], errors="coerce").dropna()
     ng_vmin = float(ng.quantile(0.01)) if len(ng) else 0.0
     ng_vmax = float(ng.quantile(0.99)) if len(ng) else 1.0
@@ -210,21 +176,11 @@ def plot_sample(sample_id: str, vmin: float, vmax: float, path_palette: dict[str
     )
     _clear_embedding_axes(axes[0, 2])
 
-    sc.pl.spatial(
-        adata,
-        color="detachment_score",
-        img_key="hires",
-        basis="spatial",
-        ax=axes[1, 0],
-        show=False,
-        vmin=vmin,
-        vmax=vmax,
-        cmap="YlOrRd",
-        size=1.5,
-        title="Detachment score",
-        colorbar_loc="right",
-    )
-    _clear_embedding_axes(axes[1, 0])
+    axes[1, 0].imshow(cyt_raw)
+    for polygon in json.loads(annotation_path(sample_id).read_text())["polygons"]:
+        axes[1, 0].add_patch(plt.Polygon(polygon, closed=True, fill=False, edgecolor=ASSIGN_PALETTE["detached"], lw=1))
+    axes[1, 0].set_title("Annotated detachment")
+    axes[1, 0].axis("off")
 
     sc.pl.spatial(
         adata,
@@ -271,10 +227,9 @@ def main() -> None:
     apply_style()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     sample_ids = SAMPLES["sample_id"].tolist()
-    vmin, vmax = score_limits(sample_ids)
     path_palette = build_path_palette(sample_ids)
     for sample_id in sample_ids:
-        plot_sample(sample_id, vmin, vmax, path_palette)
+        plot_sample(sample_id, path_palette)
 
 
 if __name__ == "__main__":
