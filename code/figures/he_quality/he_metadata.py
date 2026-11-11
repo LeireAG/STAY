@@ -8,7 +8,9 @@ ResolutionUnit (cm or inch), or with the ImageJ unit when ResolutionUnit is none
 20x scan, 45233 = 3450 for a 3.45 um camera pixel). For H&E images, um_per_px_he_quality is the value
 he_quality.py uses, to check against um_per_px.
 
-Writes results/he_quality/image_metadata.csv, one row per image.
+Writes to results/he_quality:
+  - image_metadata.csv: one row per image
+  - image_metadata.png: per H&E image, scanner, native pixel size and file type; same value, same colour
 
   python code/figures/he_quality/he_metadata.py
 """
@@ -19,6 +21,7 @@ import re
 import sys
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import tifffile
@@ -94,6 +97,63 @@ def image_metadata(path: Path) -> dict:
         }
 
 
+def describe(r: pd.Series) -> pd.Series:
+    """Scanner, native pixel size and file type of one image, in plain words."""
+    exported = pd.notna(r.get("imagej_version"))
+    if pd.notna(r.get("metafer_scanner_id")):
+        scanner = f"Metafer {r['metafer_scanner_id']}"
+    elif "Metafer" in str(r.get("make", "")):
+        scanner = "Metafer"
+    else:
+        scanner = "Not recorded (export)" if exported else "Not recorded"
+    compression = {"JPEG": "JPEG (lossy)", "NONE": "Uncompressed", "LZW": "Lossless (LZW)"}.get(r["compression"],
+                                                                                            r["compression"])
+    return pd.Series(
+        {
+            "Scanner": scanner,
+            "Native pixel size": f"{r['um_per_px']:.3f} µm" if pd.notna(r["um_per_px"]) else "Unknown",
+            "File": compression + (", ImageJ export" if exported else ""),
+        }
+    )
+
+
+def summary(table: pd.DataFrame) -> pd.DataFrame:
+    """One row per H&E image, patients in order, standard above STAY."""
+    he = table.loc[table["image"] == "he"].copy()
+    he["order"] = he["method"].map({"standard": 0, "STAY": 1})
+    he = he.sort_values(["patient_id", "order"])
+    rows = he.apply(describe, axis=1)
+    rows.index = he["patient_id"].str.replace("_", " ") + "  " + he["method"].map({"standard": "Standard", "STAY": "STAY"})
+    return rows
+
+
+def plot_summary(rows: pd.DataFrame) -> None:
+    palette = ["#CFE6F5", "#FBE3B5", "#C8EBDD", "#F3D3E6", "#E5E5E5", "#F7D9C4"]
+    plt.rcParams.update({"font.family": "sans-serif", "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"]})
+    fig, ax = plt.subplots(figsize=(8.5, 0.42 * len(rows) + 0.7))
+    widths = [1.6, 2.4, 1.6, 2.6]
+    x = np.concatenate([[0], np.cumsum(widths)])
+    for j, header in enumerate(["Image", *rows.columns]):
+        ax.text(x[j] + 0.1, -0.6, header, fontweight="bold", va="center", fontsize=10)
+    for j, col in enumerate(rows.columns, start=1):
+        colors = {v: palette[k % len(palette)] for k, v in enumerate(dict.fromkeys(rows[col]))}
+        for i, value in enumerate(rows[col]):
+            ax.add_patch(plt.Rectangle((x[j], i), widths[j] - 0.05, 0.92, color=colors[value], lw=0))
+            ax.text(x[j] + 0.1, i + 0.46, value, va="center", fontsize=9)
+    for i, label in enumerate(rows.index):
+        ax.text(x[0] + 0.1, i + 0.46, label, va="center", fontsize=9)
+        if i and label.split("  ")[0] != rows.index[i - 1].split("  ")[0]:
+            ax.axhline(i - 0.04, color="0.4", lw=0.8)
+    ax.set_xlim(0, x[-1])
+    ax.set_ylim(len(rows), -1.1)
+    ax.axis("off")
+    fig.tight_layout()
+    out = RESULTS_DIR / "image_metadata.png"
+    fig.savefig(out, dpi=200)
+    plt.close(fig)
+    print(f"wrote {out}", flush=True)
+
+
 def main() -> None:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -111,6 +171,7 @@ def main() -> None:
     table = pd.DataFrame(rows).replace("", np.nan).dropna(axis=1, how="all")
     table.to_csv(out, index=False)
     print(f"wrote {out}", flush=True)
+    plot_summary(summary(table))
 
 
 if __name__ == "__main__":
