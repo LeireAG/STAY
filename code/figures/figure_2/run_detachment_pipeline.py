@@ -36,6 +36,8 @@ COHORT = SAMPLES.set_index("sample_id")["cohort"].to_dict()
 # raw matrix: has every spot of the capture area, including detached ones outside Space Ranger's tissue mask
 MATRIX_NAME = "raw_feature_bc_matrix.h5"
 SPOT_PITCH_UM = 100.0  # Visium centre-to-centre distance of neighbouring spots
+# annotation images are the CytAssist image downscaled by this factor; annotations are saved in full-size pixels
+ANNOTATION_SCALE = 0.5
 
 
 def cohort_dir(key: str, sample_id: str) -> Path:
@@ -45,6 +47,11 @@ def cohort_dir(key: str, sample_id: str) -> Path:
 
 def annotation_path(sample_id: str) -> Path:
     return cohort_dir("detachment_annotation", sample_id) / f"{sample_id}.json"
+
+
+def annotation_input_path(sample_id: str, image: str) -> Path:
+    """Light JPEG of prepare_annotation.py; image is "cytassist" or "he"."""
+    return cohort_dir("detachment_annotation_input", sample_id) / f"{sample_id}_{image}.jpg"
 
 
 def read_spots(sample_dir: Path) -> pd.DataFrame:

@@ -6,6 +6,9 @@ __pycache__/
 /data/**
 !/data/**/
 !/data/**/README.md
+# detachment annotation (Figure 2): light images to annotate and the manual annotations
+!/data/analysis/*/detachment_annotation_input/*.jpg
+!/data/analysis/*/detachment_annotation/*.json
 /results/**
 !/results/README.md
 

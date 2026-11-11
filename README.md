@@ -64,7 +64,8 @@ In R, load the environment with `renv::load("environment")` before running a not
 
 ```bash
 conda activate stay-python
-python code/figures/figure_2/annotate_detachment.py       # draw detached areas in napari (add --review to revisit)
+python code/figures/figure_2/prepare_annotation.py        # light images to annotate (git-tracked), where the data is
+python code/figures/figure_2/annotate_detachment.py       # draw detached areas in napari, on a machine with a screen (--review to revisit)
 python code/figures/figure_2/run_detachment_pipeline.py   # per-spot detachment calls and detached area
 python code/figures/figure_2/plot_detachment_cohort.py    # cohort plots and statistics
 python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial panels
