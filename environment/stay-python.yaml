@@ -1,4 +1,4 @@
-name: detachment-score
+name: stay-python
 channels:
   - conda-forge
   - nodefaults
