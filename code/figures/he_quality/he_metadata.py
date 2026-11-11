@@ -5,12 +5,13 @@ For every TIFF in data/raw_data/paired/<sample_id>/images/*/: format (size, comp
 size, scanner and software tags, dates, and the source of exported images. Pixel size comes from XResolution with
 ResolutionUnit (cm or inch), or with the ImageJ unit when ResolutionUnit is none. The Metafer (45xxx) and CytAssist
 (65xxx) tags are private and undocumented; their names here are inferred from their values (e.g. 45232 = 20030 on a
-20x scan, 45233 = 3450 for a 3.45 um camera pixel). For H&E images, um_per_px_he_quality is the value
-he_quality.py uses, to check against um_per_px.
+20x scan, 45233 = 3450 for a 3.45 um camera pixel). For H&E images, um_per_px_he_quality is the native value
+he_quality.py uses (to check against um_per_px) and um_per_px_compared the pixel size all images are compared at.
 
 Writes to results/he_quality:
   - image_metadata.csv: one row per image
-  - image_metadata.png: per H&E image, scanner, native pixel size and file type; same value, same colour
+  - image_metadata.png: per H&E image, scanner, objective, scan date, native and compared pixel size, image size,
+    field of view and file type; in the categorical columns, the same value has the same colour
 
   python code/figures/he_quality/he_metadata.py
 """
@@ -27,7 +28,7 @@ import pandas as pd
 import tifffile
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from he_quality import MICRONS_PER_PIXEL, RAW_DIR, RESULTS_DIR, SAMPLES
+from he_quality import MICRONS_PER_PIXEL, RAW_DIR, RESULTS_DIR, SAMPLES, TARGET_UM
 
 UNIT_UM = {2: 25400.0, 3: 10000.0}  # TIFF ResolutionUnit: inch, cm
 # private tag: column name, inferred from the values
@@ -98,7 +99,7 @@ def image_metadata(path: Path) -> dict:
 
 
 def describe(r: pd.Series) -> pd.Series:
-    """Scanner, native pixel size and file type of one image, in plain words."""
+    """The key facts of one image, in plain words."""
     exported = pd.notna(r.get("imagej_version"))
     if pd.notna(r.get("metafer_scanner_id")):
         scanner = f"Metafer {r['metafer_scanner_id']}"
@@ -106,12 +107,20 @@ def describe(r: pd.Series) -> pd.Series:
         scanner = "Metafer"
     else:
         scanner = "Not recorded (export)" if exported else "Not recorded"
+    magnification = r.get("metafer_magnification_x1000")
+    scan_start = r.get("metafer_scan_start")
     compression = {"JPEG": "JPEG (lossy)", "NONE": "Uncompressed", "LZW": "Lossless (LZW)"}.get(r["compression"],
                                                                                             r["compression"])
+    um, width, height = r["um_per_px"], r["width_px"], r["height_px"]
     return pd.Series(
         {
             "Scanner": scanner,
-            "Native pixel size": f"{r['um_per_px']:.3f} µm" if pd.notna(r["um_per_px"]) else "Unknown",
+            "Objective": f"{float(magnification) / 1000:.0f}×" if pd.notna(magnification) else "Not recorded",
+            "Scan date": str(scan_start)[:10] if pd.notna(scan_start) else "Not recorded",
+            "Pixel size (native)": f"{um:.3f} µm" if pd.notna(um) else "Unknown",
+            "Pixel size (compared)": f"{r['um_per_px_compared']:.3f} µm",
+            "Image size (px)": f"{width:,} × {height:,}",
+            "Field of view": f"{width * um / 1000:.1f} × {height * um / 1000:.1f} mm" if pd.notna(um) else "Unknown",
             "File": compression + (", ImageJ export" if exported else ""),
         }
     )
@@ -129,16 +138,20 @@ def summary(table: pd.DataFrame) -> pd.DataFrame:
 
 def plot_summary(rows: pd.DataFrame) -> None:
     palette = ["#CFE6F5", "#FBE3B5", "#C8EBDD", "#F3D3E6", "#E5E5E5", "#F7D9C4"]
+    coloured = {"Scanner", "Objective", "Pixel size (native)", "Pixel size (compared)", "File"}
     plt.rcParams.update({"font.family": "sans-serif", "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"]})
-    fig, ax = plt.subplots(figsize=(8.5, 0.42 * len(rows) + 0.7))
-    widths = [1.6, 2.4, 1.6, 2.6]
+    # column width from its longest text, in figure inches
+    texts = [[str(v) for v in rows.index]] + [[col, *map(str, rows[col])] for col in rows.columns]
+    widths = [0.075 * max(map(len, t)) + 0.35 for t in texts]
     x = np.concatenate([[0], np.cumsum(widths)])
+    fig, ax = plt.subplots(figsize=(x[-1] + 0.3, 0.42 * len(rows) + 0.7))
     for j, header in enumerate(["Image", *rows.columns]):
         ax.text(x[j] + 0.1, -0.6, header, fontweight="bold", va="center", fontsize=10)
     for j, col in enumerate(rows.columns, start=1):
         colors = {v: palette[k % len(palette)] for k, v in enumerate(dict.fromkeys(rows[col]))}
         for i, value in enumerate(rows[col]):
-            ax.add_patch(plt.Rectangle((x[j], i), widths[j] - 0.05, 0.92, color=colors[value], lw=0))
+            fill = colors[value] if col in coloured else "#F5F5F5"
+            ax.add_patch(plt.Rectangle((x[j], i), widths[j] - 0.05, 0.92, color=fill, lw=0))
             ax.text(x[j] + 0.1, i + 0.46, value, va="center", fontsize=9)
     for i, label in enumerate(rows.index):
         ax.text(x[0] + 0.1, i + 0.46, label, va="center", fontsize=9)
@@ -164,7 +177,8 @@ def main() -> None:
             rows.append({"sample_id": sample_id, "patient_id": str(row["patient_id"]),
                          "method": sample_id.rsplit("_", 1)[1], "image": image, "folder": path.parent.name,
                          **image_metadata(path),
-                         "um_per_px_he_quality": MICRONS_PER_PIXEL[sample_id] if image == "he" else np.nan})
+                         "um_per_px_he_quality": MICRONS_PER_PIXEL[sample_id] if image == "he" else np.nan,
+                         "um_per_px_compared": TARGET_UM if image == "he" else np.nan})
             print(f"{sample_id}: {path.parent.name}/{path.name}", flush=True)
     out = RESULTS_DIR / "image_metadata.csv"
     # drop columns that are empty for every image
