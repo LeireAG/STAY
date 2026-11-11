@@ -45,21 +45,27 @@ KEYS = ("Keys: **Enter**/**S** save and next · hold **H** show H&E · hold **Sp
 
 
 class Keys(pn.reactive.ReactiveHTML):
-    """Reports the shortcut keys pressed and released anywhere on the page (not while typing in a text field)."""
+    """Shortcut keys anywhere on the page (not while typing in a text field). Space switches Bokeh's pan tool on while
+    held, in the browser. H is held, so it gets its own on/off field: a release can never be lost behind the next key."""
 
-    pressed = param.String()  # "<key>:<down|up>:<time>", so repeating the same key still counts as a change
+    h = param.Boolean()
+    pressed = param.String()  # "<key>:<time>" for the other keys, so repeating a key still counts as a change
     _template = "<div></div>"
     _scripts = {"render": """
-const report = (e, phase) => {
+const report = (e, down) => {
   const key = e.key === " " ? "space" : e.key.toLowerCase()
   if (!["enter", "s", "h", "space", "z", "b", "k"].includes(key) || e.ctrlKey || e.metaKey
       || ["INPUT", "TEXTAREA"].includes(e.target.tagName)) return
   if (key === "space") e.preventDefault()  // no page scrolling
-  if (e.repeat || (phase === "up" && !["h", "space"].includes(key))) return
-  data.pressed = key + ":" + phase + ":" + Date.now()
+  if (e.repeat) return
+  if (key === "space") {
+    const tool = down ? "PanTool" : "PolyDrawTool"
+    for (const doc of Bokeh.documents) for (const m of doc.all_models) if (m.constructor.__name__ === tool) m.active = true
+  } else if (key === "h") data.h = down
+  else if (down) data.pressed = key + ":" + Date.now()
 }
-document.addEventListener("keydown", (e) => report(e, "down"))
-document.addEventListener("keyup", (e) => report(e, "up"))"""}
+document.addEventListener("keydown", (e) => report(e, true))
+document.addEventListener("keyup", (e) => report(e, false))"""}
 
 
 def load(sample_id: str) -> tuple[int, int, np.ndarray, np.ndarray]:
@@ -130,8 +136,7 @@ def show(drawn: list | None = None) -> None:
     streams.PolyEdit(source=polys)
     bounds = (0, 0, w, h)
     plot.object = (hv.RGB(cyt, bounds=bounds) * hv.RGB(he, bounds=bounds).apply.opts(alpha=he_alpha) * polys).opts(
-        data_aspect=1, frame_width=1000, xaxis=None, yaxis=None, active_tools=["poly_draw", "wheel_zoom"],
-        hooks=[lambda p, _: state.update(toolbar=p.state.toolbar)])  # for the Space-to-pan key
+        data_aspect=1, frame_width=1000, xaxis=None, yaxis=None, active_tools=["poly_draw", "wheel_zoom"])
     done = "already saved, " if path.exists() else ""
     status.object = (f"**Section {k + 1} of {len(order)}** ({done}{state['saved']} saved this session). "
                      f"**Hold** to start a polygon, click corners, **hold** (or Esc) to finish; drag to move, click + Backspace "
@@ -151,18 +156,9 @@ def go(step: int, save_current: bool = False) -> None:
     show()
 
 
-def drag_tool(name: str):
-    """The plot's pan or polygon-drawing tool."""
-    return next(t for t in state["toolbar"].tools if type(t).__name__ == name)
-
-
 def on_key(event) -> None:
-    key, phase, _ = event.new.split(":")
-    if key == "h":
-        show_he.value = phase == "down"
-    elif key == "space" and "toolbar" in state:
-        state["toolbar"].active_drag = drag_tool("PanTool" if phase == "down" else "PolyDrawTool")
-    elif key in ("enter", "s") and not save.disabled:
+    key = event.new.split(":")[0]
+    if key in ("enter", "s") and not save.disabled:
         go(+1, save_current=True)
     elif key == "k" and not skip.disabled:
         go(+1)
@@ -176,5 +172,6 @@ save.on_click(lambda _: go(+1, save_current=True))
 skip.on_click(lambda _: go(+1))
 back.on_click(lambda _: go(-1))
 keys.param.watch(on_key, "pressed")
+keys.param.watch(lambda event: setattr(show_he, "value", event.new), "h")
 show()
 pn.Column(status, pn.Row(opacity, show_he, save, skip, back, keys), plot).servable(title="Detachment annotation")
