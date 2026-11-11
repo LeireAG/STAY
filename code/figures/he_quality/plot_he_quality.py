@@ -37,8 +37,8 @@ METRICS = {
         "entropy": "Entropy (bits)",
     },
     "Sharpness": {
-        "laplacian_var": "Laplacian variance (a.u.)",
-        "tenengrad": "Tenengrad (a.u.)",
+        "laplacian_var": "Laplacian variance (grey levels²)",
+        "tenengrad": "Tenengrad (grey levels²)",
     },
     "Texture": {
         "glcm_contrast": "GLCM contrast",
@@ -47,9 +47,9 @@ METRICS = {
         "glcm_correlation": "GLCM correlation",
     },
     "Colour": {
-        "mean_red": "Red (0–255)",
-        "mean_green": "Green (0–255)",
-        "mean_blue": "Blue (0–255)",
+        "mean_red": "Red channel (0–255)",
+        "mean_green": "Green channel (0–255)",
+        "mean_blue": "Blue channel (0–255)",
         "saturation": "Saturation (0–255)",
     },
 }
@@ -123,9 +123,12 @@ def plot_panels(pairs: pd.DataFrame, stats: pd.DataFrame) -> None:
     fig = plt.figure(figsize=(183 * MM, 150 * MM))
     grid = GridSpec(len(METRICS), ncol, figure=fig, wspace=0.75, hspace=0.45, left=0.09, right=0.99, top=0.97,
                     bottom=0.04)
+    letters = iter("abcdefghijklmnopqrstuvwxyz")
     for i, (group, metrics) in enumerate(METRICS.items()):
         for j, (metric, label) in enumerate(metrics.items()):
             ax = fig.add_subplot(grid[i, j])
+            ax.annotate(next(letters), xy=(0, 1), xycoords="axes fraction", xytext=(-24, 6), textcoords="offset points",
+                        ha="left", va="bottom", fontweight="bold", fontsize=8)
             for _, r in pairs.loc[pairs["metric"] == metric].iterrows():
                 p = r["patient_id"]
                 ax.plot([0, 1], [r["standard"], r["STAY"]], color=colors[p], lw=0.8, marker=markers[p],

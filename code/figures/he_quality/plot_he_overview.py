@@ -2,6 +2,7 @@
 """Arrange the thumbnails and crops written by he_crops.py into figures, without touching the raw images.
 
 Writes to results/he_quality:
+  - he_images.pdf: all figures below, one per page
   - he_overview.pdf/png: whole sections, one row per patient, standard and STAY side by side; boxes mark the crops.
     Scale bars, OVERVIEW_BAR_UM.
   - he_crops_<patient_id>.pdf/png: per crop, standard and STAY at the metrics' pixel size, each next to a zoom
@@ -16,6 +17,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.patches import Rectangle
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -52,9 +54,9 @@ def show(ax: plt.Axes, img, um_per_px: float, bar_um: float) -> None:
     ax.set_axis_off()
 
 
-def plot_overview(crops: pd.DataFrame) -> None:
+def plot_overview(crops: pd.DataFrame) -> plt.Figure:
     patients = sorted(crops["patient_id"].unique())
-    fig, axes = plt.subplots(len(patients), 2, figsize=(120 * MM, 45 * MM * len(patients)), squeeze=False)
+    fig, axes = plt.subplots(len(patients), 2, figsize=(183 * MM, 55 * MM * len(patients)), squeeze=False)
     for i, patient in enumerate(patients):
         for j, method in enumerate(METHODS):
             ax = axes[i, j]
@@ -72,10 +74,10 @@ def plot_overview(crops: pd.DataFrame) -> None:
         axes[i, 0].text(-0.04, 0.5, patient.replace("_", " "), transform=axes[i, 0].transAxes, rotation=90,
                         ha="right", va="center", fontsize=7)
     fig.tight_layout()
-    save(fig, "he_overview")
+    return fig
 
 
-def plot_crops(crops: pd.DataFrame, patient: str) -> None:
+def plot_crops(crops: pd.DataFrame, patient: str) -> plt.Figure:
     sub = crops.loc[crops["patient_id"] == patient]
     n_crops = int(sub["crop"].max())
     fig, axes = plt.subplots(n_crops, 4, figsize=(183 * MM, 47 * MM * n_crops), squeeze=False,
@@ -94,24 +96,25 @@ def plot_crops(crops: pd.DataFrame, patient: str) -> None:
             show(ax_zoom, img[y0 : y0 + round(z), x0 : x0 + round(z)], um, ZOOM_BAR_UM)
             if i == 0:
                 ax_crop.set_title(METHOD_LABELS[method], fontsize=7, loc="left")
-        axes[i, 0].text(-0.04, 0.5, f"Crop {i + 1}", transform=axes[i, 0].transAxes, rotation=90, ha="right",
-                        va="center", fontsize=7)
-    save(fig, f"he_crops_{patient}")
-
-
-def save(fig: plt.Figure, name: str) -> None:
-    for ext in ["pdf", "png"]:
-        fig.savefig(RESULTS_DIR / f"{name}.{ext}", bbox_inches="tight", dpi=600)
-    plt.close(fig)
-    print(f"wrote {RESULTS_DIR / name}.png", flush=True)
+        axes[i, 0].text(-0.04, 0.5, f"{patient.replace('_', ' ')}, crop {i + 1}", transform=axes[i, 0].transAxes,
+                        rotation=90, ha="right", va="center", fontsize=7)
+    return fig
 
 
 def main() -> None:
     apply_style()
     crops = pd.read_csv(RESULTS_DIR / "crops.csv")
-    plot_overview(crops)
+    figures = {"he_overview": plot_overview(crops)}
     for patient in sorted(crops["patient_id"].unique()):
-        plot_crops(crops, patient)
+        figures[f"he_crops_{patient}"] = plot_crops(crops, patient)
+
+    with PdfPages(RESULTS_DIR / "he_images.pdf") as pdf:
+        for name, fig in figures.items():
+            for ext in ["pdf", "png"]:
+                fig.savefig(RESULTS_DIR / f"{name}.{ext}", bbox_inches="tight", dpi=600)
+            pdf.savefig(fig, bbox_inches="tight", dpi=600)
+            plt.close(fig)
+    print(f"wrote {RESULTS_DIR / 'he_images.pdf'} ({len(figures)} pages)", flush=True)
 
 
 if __name__ == "__main__":
