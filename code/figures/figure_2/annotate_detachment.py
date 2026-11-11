@@ -2,8 +2,10 @@
 """Blinded manual annotation of detached tissue on the CytAssist images, in the browser (Panel/HoloViews).
 
 Shows the STAY and standard sections one at a time in a new random order per browser session, labelled only
-"Section k of n" (never the sample ID or cohort): the CytAssist image with the H&E warped onto it (H&E opacity slider
-to fade between them) and a polygon layer. Polygons are saved in CytAssist image pixels (x right, y down) to
+"Section k of n" (never the sample ID or cohort): the CytAssist image with the H&E warped onto it and a polygon layer.
+The H&E opacity slider fades between the two images; "Show H&E" shows the H&E fully. The next section is loaded in
+the background. Keys: Enter or S save and next, H show H&E, Z undo the last polygon, B back, K skip.
+Polygons are saved in CytAssist image pixels (x right, y down) to
 data/analysis/{cohort}/detachment_annotation/<sample_id>.json, which run_detachment_pipeline.py reads; a section saved
 with no polygons counts as annotated without detachment.
 
@@ -12,14 +14,18 @@ with no polygons counts as annotated without detachment.
   http://localhost:5006/annotate_detachment                               # (add ?review=1 to revisit all)
 """
 
+from __future__ import annotations
+
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import cv2
 import holoviews as hv
 import numpy as np
 import panel as pn
+import param
 from holoviews import streams
 
 if __name__ == "__main__":  # plain `python` only builds the page; `panel serve` serves it
@@ -31,6 +37,22 @@ from run_detachment_pipeline import (SAMPLES, annotation_path, cohort_dir, read_
 
 hv.extension("bokeh")
 DISPLAY_PX = 1200  # images are sent to the browser at this size; polygons stay in full-size pixels
+KEYS = "Keys: **Enter**/**S** save and next · **H** show H&E · **Z** undo last polygon · **B** back · **K** skip"
+
+
+class Keys(pn.reactive.ReactiveHTML):
+    """Reports the shortcut keys pressed anywhere on the page (not while typing in a text field)."""
+
+    pressed = param.String()  # "<key>:<time>", so pressing the same key twice still counts as a change
+    _template = "<div></div>"
+    _scripts = {"render": """
+document.addEventListener("keydown", (e) => {
+  const key = e.key.toLowerCase()
+  if (["enter", "s", "h", "z", "b", "k"].includes(key) && !e.repeat && !e.ctrlKey && !e.metaKey
+      && !["INPUT", "TEXTAREA"].includes(e.target.tagName)) {
+    data.pressed = key + ":" + Date.now()
+  }
+})"""}
 
 
 def load(sample_id: str) -> tuple[int, int, np.ndarray, np.ndarray]:
@@ -48,51 +70,95 @@ def load(sample_id: str) -> tuple[int, int, np.ndarray, np.ndarray]:
 review = "review" in pn.state.session_args
 order = np.random.default_rng().permutation(  # unseeded: a new order per session
     [s for s in SAMPLES["sample_id"] if review or not annotation_path(s).exists()]).tolist()
-state = {"k": 0}
+state = {"k": 0, "saved": 0}
+pool, loaded = ThreadPoolExecutor(max_workers=1), {}
+
+
+def images(k: int):
+    """Section k's images, loading them in the background if not requested yet."""
+    if k not in loaded:
+        loaded[k] = pool.submit(load, order[k])
+    return loaded[k]
+
+
 opacity = pn.widgets.FloatSlider(name="H&E opacity", start=0, end=1, step=0.05, value=0)
-save, skip = pn.widgets.Button(name="Save and next", button_type="primary"), pn.widgets.Button(name="Skip")
-status, plot = pn.pane.Markdown(), pn.pane.HoloViews()
+show_he = pn.widgets.Toggle(name="Show H&E (H)")
+he_alpha = pn.bind(lambda show, value: 1.0 if show else value, show_he, opacity)
+save, skip, back = (pn.widgets.Button(name=n, button_type=t) for n, t in
+                    [("Save and next (Enter)", "primary"), ("Skip (K)", "default"), ("Back (B)", "default")])
+status, plot, keys = pn.pane.Markdown(), pn.pane.HoloViews(), Keys(width=0, height=0)
 
 
-def show() -> None:
+def polygons() -> list[list[list[float]]]:
+    """The polygons drawn so far, in image pixels (y down), without the closing repeat of the first corner."""
+    data, h = state["draw"].data or {"xs": [], "ys": []}, state["h"]
+    out = []
+    for xs, ys in zip(data["xs"], data["ys"]):
+        points = [[round(float(x), 1), round(h - float(y), 1)] for x, y in zip(xs, ys)]
+        if len(points) > 1 and points[0] == points[-1]:
+            points.pop()
+        if len(points) >= 3:
+            out.append(points)
+    return out
+
+
+def show(drawn: list | None = None) -> None:
+    """Display section k; with drawn, redisplay it with those polygons instead of the saved ones."""
     k = state["k"]
     if k >= len(order):
-        status.object, plot.object, save.disabled, skip.disabled = "**All sections done.**", None, True, True
+        status.object, plot.object = f"**All {len(order)} sections done.**", None
+        for button in (save, skip):
+            button.disabled = True
         return
-    sample_id = order[k]
-    h, w, cyt, he = load(sample_id)
-    path = annotation_path(sample_id)
-    earlier = json.loads(path.read_text())["polygons"] if path.exists() else []
+    h, w, cyt, he = images(k).result()
+    if k + 1 < len(order):
+        images(k + 1)  # preload the next section
+    path = annotation_path(order[k])
+    if drawn is None:
+        drawn = json.loads(path.read_text())["polygons"] if path.exists() else []
     # the plot's y axis points up, image pixels point down: y_plot = h - y_pixel
-    polys = hv.Polygons([{"x": [x for x, _ in p], "y": [h - y for _, y in p]} for p in earlier]).opts(
+    polys = hv.Polygons([{"x": [x for x, _ in p], "y": [h - y for _, y in p]} for p in drawn]).opts(
         fill_alpha=0.2, fill_color="yellow", line_color="yellow", line_width=2)
-    state.update(sample_id=sample_id, h=h, draw=streams.PolyDraw(source=polys, drag=True, show_vertices=True))
+    state.update(h=h, draw=streams.PolyDraw(source=polys, drag=True, show_vertices=True))
     streams.PolyEdit(source=polys)
     bounds = (0, 0, w, h)
-    plot.object = (hv.RGB(cyt, bounds=bounds) * hv.RGB(he, bounds=bounds).apply.opts(alpha=opacity) * polys).opts(
-        data_aspect=1, frame_width=900, xaxis=None, yaxis=None, active_tools=["poly_draw", "wheel_zoom"])
-    status.object = (f"**Section {k + 1} of {len(order)}**: click to add corners, double-click to close a polygon; "
-                     "drag to move it; select and press Backspace to delete")
+    plot.object = (hv.RGB(cyt, bounds=bounds) * hv.RGB(he, bounds=bounds).apply.opts(alpha=he_alpha) * polys).opts(
+        data_aspect=1, frame_width=1000, xaxis=None, yaxis=None, active_tools=["poly_draw", "wheel_zoom"])
+    done = "already saved, " if path.exists() else ""
+    status.object = (f"**Section {k + 1} of {len(order)}** ({done}{state['saved']} saved this session). "
+                     f"Click corners, double-click to close a polygon; drag to move, click + Backspace to delete.  \n{KEYS}")
+    for button in (save, skip):
+        button.disabled = False
+    back.disabled = k == 0
 
 
-def next_section(saved: bool) -> None:
-    if saved:
-        data, h = state["draw"].data, state["h"]
-        polygons = []
-        for xs, ys in zip(data["xs"], data["ys"]):
-            points = [[round(float(x), 1), round(h - float(y), 1)] for x, y in zip(xs, ys)]
-            if len(points) > 1 and points[0] == points[-1]:  # drop the closing repeat of the first corner
-                points.pop()
-            if len(points) >= 3:
-                polygons.append(points)
-        path = annotation_path(state["sample_id"])
+def go(step: int, save_current: bool = False) -> None:
+    if save_current:
+        path = annotation_path(order[state["k"]])
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"polygons": polygons}))
-    state["k"] += 1
+        path.write_text(json.dumps({"polygons": polygons()}))
+        state["saved"] += 1
+    state["k"] = max(0, state["k"] + step)
     show()
 
 
-save.on_click(lambda _: next_section(True))
-skip.on_click(lambda _: next_section(False))
+def on_key(event) -> None:
+    key = event.new.split(":")[0]
+    if key in ("enter", "s") and not save.disabled:
+        go(+1, save_current=True)
+    elif key == "k" and not skip.disabled:
+        go(+1)
+    elif key == "b" and not back.disabled:
+        go(-1)
+    elif key == "h":
+        show_he.value = not show_he.value
+    elif key == "z" and state["k"] < len(order):
+        show(drawn=polygons()[:-1])
+
+
+save.on_click(lambda _: go(+1, save_current=True))
+skip.on_click(lambda _: go(+1))
+back.on_click(lambda _: go(-1))
+keys.param.watch(on_key, "pressed")
 show()
-pn.Column(status, pn.Row(opacity, save, skip), plot).servable(title="Detachment annotation")
+pn.Column(status, pn.Row(opacity, show_he, save, skip, back, keys), plot).servable(title="Detachment annotation")
