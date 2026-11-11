@@ -22,6 +22,9 @@ import numpy as np
 import panel as pn
 from holoviews import streams
 
+if __name__ == "__main__":  # plain `python` only builds the page; `panel serve` serves it
+    sys.exit("Start it with: panel serve code/figures/figure_2/annotate_detachment.py --port 5006")
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_detachment_pipeline import (SAMPLES, annotation_path, cohort_dir, read_cytassist_coords,
                                      read_cytassist_image, read_image, read_spots, warp_image)
