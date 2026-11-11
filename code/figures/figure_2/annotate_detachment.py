@@ -6,8 +6,8 @@ Shows the STAY and standard sections one at a time in a new random order per bro
 Drawing (Bokeh's polygon tool): press and hold to place the first corner, click to add corners, press and hold (or
 Esc) to place the last one; drag a polygon to move it; click it and press Backspace to delete it.
 The H&E opacity slider fades between the two images; "Show H&E" shows the H&E fully. The next section is loaded in
-the background. Keys: Enter or S save and next, hold H to show the H&E, hold Space and drag to pan, Z undo the last
-polygon, B back, K skip.
+the background. Keys: Enter or S save and next, hold H to show the H&E, Shift + scroll to change the H&E opacity, hold
+Space and drag to pan, Z undo the last polygon, B back, K skip.
 Polygons are saved in CytAssist image pixels (x right, y down) to
 data/analysis/{cohort}/detachment_annotation/<sample_id>.json, which run_detachment_pipeline.py reads; a section saved
 with no polygons counts as annotated without detachment.
@@ -19,6 +19,7 @@ with no polygons counts as annotated without detachment.
 
 from __future__ import annotations
 
+import base64
 import json
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -39,9 +40,9 @@ from run_detachment_pipeline import (SAMPLES, annotation_path, cohort_dir, read_
                                      read_cytassist_image, read_image, read_spots, warp_image)
 
 hv.extension("bokeh")
-DISPLAY_PX = 1200  # images are sent to the browser at this size; polygons stay in full-size pixels
-KEYS = ("Keys: **Enter**/**S** save and next · hold **H** show H&E · hold **Space** + drag to pan · "
-        "**Z** undo last polygon · **B** back · **K** skip")
+JPEG_QUALITY = 95  # images go to the browser at native resolution as JPEG, ~1-3 MB instead of ~36 MB raw
+KEYS = ("Keys: **Enter**/**S** save and next · hold **H** show H&E · **Shift + scroll** H&E opacity · "
+        "hold **Space** + drag to pan · **Z** undo last polygon · **B** back · **K** skip")
 
 
 class Keys(pn.reactive.ReactiveHTML):
@@ -65,19 +66,31 @@ const report = (e, down) => {
   else if (down) data.pressed = key + ":" + Date.now()
 }
 document.addEventListener("keydown", (e) => report(e, true))
-document.addEventListener("keyup", (e) => report(e, false))"""}
+document.addEventListener("keyup", (e) => report(e, false))
+document.addEventListener("wheel", (e) => {  // Shift + scroll: H&E opacity slider, instead of zooming
+  if (!e.shiftKey) return
+  e.preventDefault(); e.stopPropagation()
+  for (const doc of Bokeh.documents) for (const m of doc.all_models)
+    if (m.constructor.__name__ === "Slider" && m.title === "H&E opacity") {
+      const step = (e.deltaY || e.deltaX) < 0 ? 0.05 : -0.05
+      m.value = Math.round(Math.min(1, Math.max(0, m.value + step)) * 20) / 20
+    }
+}, {capture: true, passive: false})"""}
 
 
-def load(sample_id: str) -> tuple[int, int, np.ndarray, np.ndarray]:
-    """Height, width and display-size CytAssist and H&E (warped onto the CytAssist image through the spots)."""
+def jpeg_url(rgb: np.ndarray) -> str:
+    _, jpeg = cv2.imencode(".jpg", cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+    return "data:image/jpeg;base64," + base64.b64encode(jpeg).decode()
+
+
+def load(sample_id: str) -> tuple[int, int, str, str]:
+    """Height, width and JPEG data URLs of the native CytAssist image and the hires H&E warped onto it."""
     sample_dir = cohort_dir("spaceranger", sample_id) / sample_id
     cyt = read_cytassist_image(sample_id)
     spots = read_cytassist_coords(sample_id, read_spots(sample_dir))
     he = warp_image(read_image(sample_dir / "spatial" / "tissue_hires_image.png"),
                     spots[["hires_x", "hires_y"]].to_numpy(float), spots[["cyt_x", "cyt_y"]].to_numpy(float), cyt.shape)
-    f = DISPLAY_PX / max(cyt.shape[:2])
-    small = [cv2.resize(img, None, fx=f, fy=f, interpolation=cv2.INTER_AREA) for img in (cyt, he)]
-    return *cyt.shape[:2], *small
+    return *cyt.shape[:2], jpeg_url(cyt), jpeg_url(he)
 
 
 review = "review" in pn.state.session_args
@@ -96,10 +109,9 @@ def images(k: int):
 
 opacity = pn.widgets.FloatSlider(name="H&E opacity", start=0, end=1, step=0.05, value=0)
 show_he = pn.widgets.Toggle(name="Show H&E (H)")
-he_alpha = pn.bind(lambda show, value: 1.0 if show else value, show_he, opacity)
 save, skip, back = (pn.widgets.Button(name=n, button_type=t) for n, t in
                     [("Save and next (Enter)", "primary"), ("Skip (K)", "default"), ("Back (B)", "default")])
-status, plot, keys = pn.pane.Markdown(), pn.pane.HoloViews(), Keys(width=0, height=0)
+status, count, plot, keys = pn.pane.Markdown(), pn.pane.Markdown(), pn.pane.HoloViews(), Keys(width=0, height=0)
 
 
 def polygons() -> list[list[list[float]]]:
@@ -119,11 +131,11 @@ def show(drawn: list | None = None) -> None:
     """Display section k; with drawn, redisplay it with those polygons instead of the saved ones."""
     k = state["k"]
     if k >= len(order):
-        status.object, plot.object = f"**All {len(order)} sections done.**", None
+        status.object, count.object, plot.object = f"**All {len(order)} sections done.**", "", None
         for button in (save, skip):
             button.disabled = True
         return
-    h, w, cyt, he = images(k).result()
+    h, w, cyt_url, he_url = images(k).result()
     if k + 1 < len(order):
         images(k + 1)  # preload the next section
     path = annotation_path(order[k])
@@ -131,12 +143,21 @@ def show(drawn: list | None = None) -> None:
         drawn = json.loads(path.read_text())["polygons"] if path.exists() else []
     # the plot's y axis points up, image pixels point down: y_plot = h - y_pixel
     polys = hv.Polygons([{"x": [x for x, _ in p], "y": [h - y for _, y in p]} for p in drawn]).opts(
-        fill_alpha=0.2, fill_color="yellow", line_color="yellow", line_width=2)
-    state.update(h=h, draw=streams.PolyDraw(source=polys, drag=True, show_vertices=True))
-    streams.PolyEdit(source=polys)
-    bounds = (0, 0, w, h)
-    plot.object = (hv.RGB(cyt, bounds=bounds) * hv.RGB(he, bounds=bounds).apply.opts(alpha=he_alpha) * polys).opts(
-        data_aspect=1, frame_width=1000, xaxis=None, yaxis=None, active_tools=["poly_draw", "wheel_zoom"])
+        fill_alpha=0.35, fill_color="yellow", line_color="yellow", line_width=3)
+    corners = {"size": 12, "fill_color": "red", "line_color": "white"}
+    state.update(h=h, draw=streams.PolyDraw(source=polys, drag=True, show_vertices=True, vertex_style=corners))
+    streams.PolyEdit(source=polys, vertex_style=corners)
+    state["draw"].add_subscriber(lambda **_: count.param.update(object=f"**Polygons on this section: {len(polygons())}**"))
+    count.object = f"**Polygons on this section: {len(drawn)}**"
+    def add_images(plot, _) -> None:  # the two images, under the polygons, as JPEGs the browser decodes itself
+        fig = plot.state
+        layers = [fig.image_url(url=[url], x=0, y=h, w=w, h=h, anchor="top_left") for url in (cyt_url, he_url)]
+        fig.renderers = layers + [r for r in fig.renderers if r not in layers]
+        state["he_glyph"] = layers[1].glyph
+        set_he_alpha()
+
+    plot.object = polys.opts(xlim=(0, w), ylim=(0, h), data_aspect=1, frame_width=1000, xaxis=None, yaxis=None,
+                             active_tools=["poly_draw", "wheel_zoom"], hooks=[add_images])
     done = "already saved, " if path.exists() else ""
     status.object = (f"**Section {k + 1} of {len(order)}** ({done}{state['saved']} saved this session). "
                      f"**Hold** to start a polygon, click corners, **hold** (or Esc) to finish; drag to move, click + Backspace "
@@ -144,6 +165,11 @@ def show(drawn: list | None = None) -> None:
     for button in (save, skip):
         button.disabled = False
     back.disabled = k == 0
+
+
+def set_he_alpha(*_) -> None:
+    if "he_glyph" in state:
+        state["he_glyph"].global_alpha = 1.0 if show_he.value else opacity.value
 
 
 def go(step: int, save_current: bool = False) -> None:
@@ -172,6 +198,8 @@ save.on_click(lambda _: go(+1, save_current=True))
 skip.on_click(lambda _: go(+1))
 back.on_click(lambda _: go(-1))
 keys.param.watch(on_key, "pressed")
+opacity.param.watch(set_he_alpha, "value")
+show_he.param.watch(set_he_alpha, "value")
 keys.param.watch(lambda event: setattr(show_he, "value", event.new), "h")
 show()
-pn.Column(status, pn.Row(opacity, show_he, save, skip, back, keys), plot).servable(title="Detachment annotation")
+pn.Column(status, pn.Row(opacity, show_he, save, skip, back, count, keys), plot).servable(title="Detachment annotation")
