@@ -44,8 +44,7 @@ The final R objects are provided, so the figure scripts can run without redoing 
 ## Setup
 
 ```bash
-conda env create -f environment/stay-python.yaml         # Python (Figure 2, H&E image quality)
-conda env create -f environment/detachment-annotation.yaml   # napari, for annotating detachment (Figure 2)
+conda env create -f environment/stay-python.yaml         # all Python scripts
 Rscript -e 'renv::restore(project = "environment")'      # R packages
 ```
 
@@ -64,9 +63,8 @@ In R, load the environment with `renv::load("environment")` before running a not
 **Figure 2 (STAY vs standard)**: detachment is annotated manually on the CytAssist images, blinded to sample and cohort; paths are in `resources/detachment.yaml`.
 
 ```bash
-conda activate detachment-annotation
-python code/figures/figure_2/annotate_detachment.py       # draw detached areas in napari (add --review to revisit)
 conda activate stay-python
+python code/figures/figure_2/annotate_detachment.py       # draw detached areas in napari (add --review to revisit)
 python code/figures/figure_2/run_detachment_pipeline.py   # per-spot detachment calls and detached area
 python code/figures/figure_2/plot_detachment_cohort.py    # cohort plots and statistics
 python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial panels
@@ -76,6 +74,7 @@ python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial p
 
 ```bash
 conda activate stay-python
+python code/figures/he_quality/he_metadata.py       # TIFF metadata of the H&E and CytAssist images (fast)
 python code/figures/he_quality/he_quality.py        # metrics per image (slow, needs the raw images)
 python code/figures/he_quality/plot_he_quality.py   # comparison and figure from the metrics CSV
 python code/figures/he_quality/he_crops.py           # thumbnails and crops (slow, needs the raw images)
