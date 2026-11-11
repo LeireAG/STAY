@@ -17,5 +17,5 @@ dependencies:
   - tifffile
   - zarr
   - imagecodecs
-  - napari  # annotate_detachment.py (needs a display)
-  - pyside6>=6.7  # Qt 6: napari needs Qt >= 6.7 (the conda "pyqt" package is Qt 5)
+  - panel  # annotate_detachment.py, served to the browser
+  - holoviews
