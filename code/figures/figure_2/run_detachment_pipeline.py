@@ -23,8 +23,6 @@ import numpy as np
 import pandas as pd
 import yaml
 
-cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
-
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 CFG = yaml.safe_load((PROJECT_ROOT / "resources" / "detachment.yaml").read_text(encoding="utf-8"))
 

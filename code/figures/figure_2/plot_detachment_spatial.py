@@ -15,7 +15,6 @@ import warnings
 from pathlib import Path
 
 import anndata as ad
-import cv2
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
@@ -23,7 +22,6 @@ import pandas as pd
 import scanpy as sc
 import yaml
 
-cv2.utils.logging.setLogLevel(cv2.utils.logging.LOG_LEVEL_ERROR)
 warnings.filterwarnings("ignore", message="Use `squidpy.pl.spatial_scatter`")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
