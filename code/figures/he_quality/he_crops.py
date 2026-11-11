@@ -6,7 +6,7 @@ For each paired section (same images and pixel sizes as he_quality.py):
   - two crops of CROP_UM x CROP_UM, read from the full-resolution image and rescaled to TARGET_UM (the pixel size
     the metrics use): crop 1 at the centre of the image, crop 2 at a random position (fixed SEED, so the same on
     every run) where the whole crop is tissue on the thumbnail (saturation above Otsu). CROP_CENTRES_UM replaces
-    both with positions set by hand.
+    both with positions set by hand; CROP_SHIFT_UM moves single crops, e.g. off an artefact.
 
 Writes to results/he_quality, for plot_he_overview.py:
   - thumbnails/<sample_id>.png
@@ -36,6 +36,10 @@ CROP_UM = 300
 SEED = 1
 # sample_id: [(x_um, y_um), ...] crop centres from the image's top-left corner, replacing the random ones
 CROP_CENTRES_UM: dict[str, list[tuple[float, float]]] = {}
+# (sample_id, crop): (dx_um, dy_um) added to that crop's centre; +x is right, +y is down
+CROP_SHIFT_UM: dict[tuple[str, int], tuple[float, float]] = {
+    ("Patient_1_STAY", 2): (300.0, 0.0),  # off an air bubble
+}
 
 
 def thumbnail(arr, um: float) -> np.ndarray:
@@ -89,6 +93,8 @@ def main() -> None:
             image_centre, random_tissue_centre(thumb, image_centre, np.random.default_rng(SEED))
         ]
         for n, (x_um, y_um) in enumerate(centres, start=1):
+            dx, dy = CROP_SHIFT_UM.get((sample_id, n), (0.0, 0.0))
+            x_um, y_um = x_um + dx, y_um + dy
             save_png(RESULTS_DIR / "crops" / f"{sample_id}_{n}.png", crop(arr, um, x_um, y_um))
             rows.append({"sample_id": sample_id, "patient_id": str(row["patient_id"]),
                          "method": sample_id.rsplit("_", 1)[1], "crop": n, "x_um": x_um, "y_um": y_um,
