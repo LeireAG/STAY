@@ -3,9 +3,10 @@
 
 For each paired section (same images and pixel sizes as he_quality.py):
   - a thumbnail of the whole image at THUMB_UM microns per pixel
-  - N_CROPS crops of CROP_UM x CROP_UM, read from the full-resolution image and rescaled to TARGET_UM (the pixel
-    size the metrics use). Crop centres are random positions (fixed SEED) where the whole crop is tissue on the
-    thumbnail (saturation above Otsu); set CROP_CENTRES_UM to place them by hand after looking at the thumbnails.
+  - two crops of CROP_UM x CROP_UM, read from the full-resolution image and rescaled to TARGET_UM (the pixel size
+    the metrics use): crop 1 at the centre of the image, crop 2 at a random position (fixed SEED, so the same on
+    every run) where the whole crop is tissue on the thumbnail (saturation above Otsu). CROP_CENTRES_UM replaces
+    both with positions set by hand.
 
 Writes to results/he_quality, for plot_he_overview.py:
   - thumbnails/<sample_id>.png
@@ -32,8 +33,7 @@ from he_quality import MICRONS_PER_PIXEL, RESULTS_DIR, SAMPLES, TARGET_UM, open_
 THUMB_FACTOR = 16  # thumbnail pixel = 16 x 16 metric pixels
 THUMB_UM = TARGET_UM * THUMB_FACTOR
 CROP_UM = 300
-N_CROPS = 2
-SEED = 0
+SEED = 1
 # sample_id: [(x_um, y_um), ...] crop centres from the image's top-left corner, replacing the random ones
 CROP_CENTRES_UM: dict[str, list[tuple[float, float]]] = {}
 
@@ -46,16 +46,19 @@ def thumbnail(arr, um: float) -> np.ndarray:
     return np.vstack(bands)
 
 
-def random_centres(thumb: np.ndarray, rng: np.random.Generator) -> list[tuple[float, float]]:
+def random_tissue_centre(thumb: np.ndarray, avoid_um: tuple[float, float], rng: np.random.Generator) -> tuple[float, float]:
+    """Random centre of a crop that is fully tissue and does not overlap the crop centred at avoid_um."""
     sat = cv2.cvtColor(thumb, cv2.COLOR_RGB2HSV)[..., 1]
     tissue = (sat > threshold_otsu(sat)).astype(np.float32)
     window = round(CROP_UM / THUMB_UM)
     inside = ndi.uniform_filter(tissue, size=window, mode="constant") > 0.999
+    ax, ay = round(avoid_um[0] / THUMB_UM), round(avoid_um[1] / THUMB_UM)
+    inside[max(ay - window, 0) : ay + window + 1, max(ax - window, 0) : ax + window + 1] = False
     ys, xs = np.nonzero(inside)
     if not len(ys):
-        raise SystemExit(f"no {CROP_UM} um window is fully tissue; set CROP_CENTRES_UM by hand")
-    pick = rng.choice(len(ys), size=min(N_CROPS, len(ys)), replace=False)
-    return [((xs[i] + 0.5) * THUMB_UM, (ys[i] + 0.5) * THUMB_UM) for i in pick]
+        raise SystemExit(f"no other {CROP_UM} um window is fully tissue; set CROP_CENTRES_UM by hand")
+    i = rng.integers(len(ys))
+    return (xs[i] + 0.5) * THUMB_UM, (ys[i] + 0.5) * THUMB_UM
 
 
 def crop(arr, um: float, x_um: float, y_um: float) -> np.ndarray:
@@ -81,7 +84,10 @@ def main() -> None:
         print(f"{sample_id}: {name}", flush=True)
         thumb = thumbnail(arr, um)
         save_png(RESULTS_DIR / "thumbnails" / f"{sample_id}.png", thumb)
-        centres = CROP_CENTRES_UM.get(sample_id) or random_centres(thumb, np.random.default_rng(SEED))
+        image_centre = (arr.shape[1] * um / 2, arr.shape[0] * um / 2)
+        centres = CROP_CENTRES_UM.get(sample_id) or [
+            image_centre, random_tissue_centre(thumb, image_centre, np.random.default_rng(SEED))
+        ]
         for n, (x_um, y_um) in enumerate(centres, start=1):
             save_png(RESULTS_DIR / "crops" / f"{sample_id}_{n}.png", crop(arr, um, x_um, y_um))
             rows.append({"sample_id": sample_id, "patient_id": str(row["patient_id"]),
