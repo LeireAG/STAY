@@ -3,8 +3,11 @@
 
 Shows the STAY and standard sections one at a time in a new random order per browser session, labelled only
 "Section k of n" (never the sample ID or cohort): the CytAssist image with the H&E warped onto it and a polygon layer.
+Drawing (Bokeh's polygon tool): press and hold to place the first corner, click to add corners, press and hold (or
+Esc) to place the last one; drag a polygon to move it; click it and press Backspace to delete it.
 The H&E opacity slider fades between the two images; "Show H&E" shows the H&E fully. The next section is loaded in
-the background. Keys: Enter or S save and next, H show H&E, Z undo the last polygon, B back, K skip.
+the background. Keys: Enter or S save and next, hold H to show the H&E, hold Space and drag to pan, Z undo the last
+polygon, B back, K skip.
 Polygons are saved in CytAssist image pixels (x right, y down) to
 data/analysis/{cohort}/detachment_annotation/<sample_id>.json, which run_detachment_pipeline.py reads; a section saved
 with no polygons counts as annotated without detachment.
@@ -37,22 +40,26 @@ from run_detachment_pipeline import (SAMPLES, annotation_path, cohort_dir, read_
 
 hv.extension("bokeh")
 DISPLAY_PX = 1200  # images are sent to the browser at this size; polygons stay in full-size pixels
-KEYS = "Keys: **Enter**/**S** save and next · **H** show H&E · **Z** undo last polygon · **B** back · **K** skip"
+KEYS = ("Keys: **Enter**/**S** save and next · hold **H** show H&E · hold **Space** + drag to pan · "
+        "**Z** undo last polygon · **B** back · **K** skip")
 
 
 class Keys(pn.reactive.ReactiveHTML):
-    """Reports the shortcut keys pressed anywhere on the page (not while typing in a text field)."""
+    """Reports the shortcut keys pressed and released anywhere on the page (not while typing in a text field)."""
 
-    pressed = param.String()  # "<key>:<time>", so pressing the same key twice still counts as a change
+    pressed = param.String()  # "<key>:<down|up>:<time>", so repeating the same key still counts as a change
     _template = "<div></div>"
     _scripts = {"render": """
-document.addEventListener("keydown", (e) => {
-  const key = e.key.toLowerCase()
-  if (["enter", "s", "h", "z", "b", "k"].includes(key) && !e.repeat && !e.ctrlKey && !e.metaKey
-      && !["INPUT", "TEXTAREA"].includes(e.target.tagName)) {
-    data.pressed = key + ":" + Date.now()
-  }
-})"""}
+const report = (e, phase) => {
+  const key = e.key === " " ? "space" : e.key.toLowerCase()
+  if (!["enter", "s", "h", "space", "z", "b", "k"].includes(key) || e.ctrlKey || e.metaKey
+      || ["INPUT", "TEXTAREA"].includes(e.target.tagName)) return
+  if (key === "space") e.preventDefault()  // no page scrolling
+  if (e.repeat || (phase === "up" && !["h", "space"].includes(key))) return
+  data.pressed = key + ":" + phase + ":" + Date.now()
+}
+document.addEventListener("keydown", (e) => report(e, "down"))
+document.addEventListener("keyup", (e) => report(e, "up"))"""}
 
 
 def load(sample_id: str) -> tuple[int, int, np.ndarray, np.ndarray]:
@@ -123,10 +130,12 @@ def show(drawn: list | None = None) -> None:
     streams.PolyEdit(source=polys)
     bounds = (0, 0, w, h)
     plot.object = (hv.RGB(cyt, bounds=bounds) * hv.RGB(he, bounds=bounds).apply.opts(alpha=he_alpha) * polys).opts(
-        data_aspect=1, frame_width=1000, xaxis=None, yaxis=None, active_tools=["poly_draw", "wheel_zoom"])
+        data_aspect=1, frame_width=1000, xaxis=None, yaxis=None, active_tools=["poly_draw", "wheel_zoom"],
+        hooks=[lambda p, _: state.update(toolbar=p.state.toolbar)])  # for the Space-to-pan key
     done = "already saved, " if path.exists() else ""
     status.object = (f"**Section {k + 1} of {len(order)}** ({done}{state['saved']} saved this session). "
-                     f"Click corners, double-click to close a polygon; drag to move, click + Backspace to delete.  \n{KEYS}")
+                     f"**Hold** to start a polygon, click corners, **hold** (or Esc) to finish; drag to move, click + Backspace "
+                     f"to delete.  \n{KEYS}")
     for button in (save, skip):
         button.disabled = False
     back.disabled = k == 0
@@ -142,16 +151,23 @@ def go(step: int, save_current: bool = False) -> None:
     show()
 
 
+def drag_tool(name: str):
+    """The plot's pan or polygon-drawing tool."""
+    return next(t for t in state["toolbar"].tools if type(t).__name__ == name)
+
+
 def on_key(event) -> None:
-    key = event.new.split(":")[0]
-    if key in ("enter", "s") and not save.disabled:
+    key, phase, _ = event.new.split(":")
+    if key == "h":
+        show_he.value = phase == "down"
+    elif key == "space" and "toolbar" in state:
+        state["toolbar"].active_drag = drag_tool("PanTool" if phase == "down" else "PolyDrawTool")
+    elif key in ("enter", "s") and not save.disabled:
         go(+1, save_current=True)
     elif key == "k" and not skip.disabled:
         go(+1)
     elif key == "b" and not back.disabled:
         go(-1)
-    elif key == "h":
-        show_he.value = not show_he.value
     elif key == "z" and state["k"] < len(order):
         show(drawn=polygons()[:-1])
 
