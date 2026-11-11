@@ -53,7 +53,6 @@ METRICS = {
         "saturation": "Saturation (0–255)",
     },
 }
-METHODS = ["standard", "STAY"]
 # Okabe-Ito
 PATIENT_COLORS = ["#0072B2", "#E69F00", "#009E73", "#CC79A7"]
 

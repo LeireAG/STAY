@@ -76,7 +76,7 @@ conda activate detachment-score
 python code/figures/he_quality/he_quality.py        # metrics per image (slow, needs the raw images)
 python code/figures/he_quality/plot_he_quality.py   # comparison and figure from the metrics CSV
 python code/figures/he_quality/he_crops.py           # thumbnails and crops (slow, needs the raw images)
-python code/figures/he_quality/plot_he_overview.py  # overview and crop figures from those PNGs
+python code/figures/he_quality/plot_he_overview.py  # one figure with all sections and crops
 ```
 
 **Other figures**, in `code/figures/`:
