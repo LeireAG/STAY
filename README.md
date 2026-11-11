@@ -73,6 +73,7 @@ python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial p
 
 ```bash
 conda activate detachment-score
+python code/figures/he_quality/he_metadata.py       # TIFF metadata of the H&E and CytAssist images (fast)
 python code/figures/he_quality/he_quality.py        # metrics per image (slow, needs the raw images)
 python code/figures/he_quality/plot_he_quality.py   # comparison and figure from the metrics CSV
 python code/figures/he_quality/he_crops.py           # thumbnails and crops (slow, needs the raw images)
