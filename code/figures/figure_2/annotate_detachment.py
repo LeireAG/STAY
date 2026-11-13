@@ -3,8 +3,8 @@
 
 Shows the STAY and standard sections one at a time in a new random order per browser session, labelled only
 "Section k of n" (never the sample ID or cohort): the CytAssist image with the H&E warped onto it and a polygon layer.
-Drawing (Bokeh's polygon tool): press and hold to place the first corner, click to add corners, press and hold (or
-Esc) to place the last one; drag a polygon to move it; click it and press Backspace to delete it.
+Drawing (Bokeh's freehand tool): click and drag around a detached area; releasing closes the outline. Click an outline
+and press Backspace to delete it; the vertex-edit tool in the toolbar adjusts its corners.
 The H&E opacity slider fades between the two images; "Show H&E" shows the H&E fully. The next section is loaded in
 the background. Keys: Enter or S save and next, hold H to show the H&E, Shift + scroll to change the H&E opacity, hold
 Space and drag to pan, Z undo the last polygon, B back, K skip.
@@ -60,7 +60,7 @@ const report = (e, down) => {
   if (key === "space") e.preventDefault()  // no page scrolling
   if (e.repeat) return
   if (key === "space") {
-    const tool = down ? "PanTool" : "PolyDrawTool"
+    const tool = down ? "PanTool" : "FreehandDrawTool"
     for (const doc of Bokeh.documents) for (const m of doc.all_models) if (m.constructor.__name__ === tool) m.active = true
   } else if (key === "h") data.h = down
   else if (down) data.pressed = key + ":" + Date.now()
@@ -144,8 +144,8 @@ def show(drawn: list | None = None) -> None:
     # the plot's y axis points up, image pixels point down: y_plot = h - y_pixel
     polys = hv.Polygons([{"x": [x for x, _ in p], "y": [h - y for _, y in p]} for p in drawn]).opts(
         fill_alpha=0.35, fill_color="yellow", line_color="yellow", line_width=3)
-    corners = {"size": 12, "fill_color": "red", "line_color": "white"}
-    state.update(h=h, draw=streams.PolyDraw(source=polys, drag=True, show_vertices=True, vertex_style=corners))
+    corners = {"size": 7, "fill_color": "red", "line_color": "white"}  # shown by the vertex-edit tool
+    state.update(h=h, draw=streams.FreehandDraw(source=polys))
     streams.PolyEdit(source=polys, vertex_style=corners)
     state["draw"].add_subscriber(lambda **_: count.param.update(object=f"**Polygons on this section: {len(polygons())}**"))
     count.object = f"**Polygons on this section: {len(drawn)}**"
@@ -157,11 +157,11 @@ def show(drawn: list | None = None) -> None:
         set_he_alpha()
 
     plot.object = polys.opts(xlim=(0, w), ylim=(0, h), data_aspect=1, frame_width=1000, xaxis=None, yaxis=None,
-                             active_tools=["poly_draw", "wheel_zoom"], hooks=[add_images])
+                             active_tools=["freehand_draw", "wheel_zoom"], hooks=[add_images])
     done = "already saved, " if path.exists() else ""
     status.object = (f"**Section {k + 1} of {len(order)}** ({done}{state['saved']} saved this session). "
-                     f"**Hold** to start a polygon, click corners, **hold** (or Esc) to finish; drag to move, click + Backspace "
-                     f"to delete.  \n{KEYS}")
+                     f"**Click and drag** around a detached area to outline it; click an outline + Backspace to delete.  "
+                     f"\n{KEYS}")
     for button in (save, skip):
         button.disabled = False
     back.disabled = k == 0
