@@ -3,8 +3,8 @@
 
 Shows the STAY and standard sections one at a time in a new random order per browser session, labelled only
 "Section k of n" (never the sample ID or cohort): the CytAssist image with the H&E warped onto it and a polygon layer.
-Drawing (Bokeh's freehand tool): click and drag around a detached area; releasing closes the outline. Click an outline
-and press Backspace to delete it; the vertex-edit tool in the toolbar adjusts its corners.
+Drawing (Bokeh's freehand tool): click and drag around a detached area; releasing closes the outline. Double-click
+inside an outline to delete it; the vertex-edit tool in the toolbar adjusts its corners.
 The H&E opacity slider fades between the two images; "Show H&E" shows the H&E fully. The next section is loaded in
 the background. Keys: Enter or S save and next, hold H to show the H&E, Shift + scroll to change the H&E opacity, hold
 Space and drag to pan, Z undo the last polygon, B back, K skip.
@@ -31,6 +31,7 @@ import numpy as np
 import panel as pn
 import param
 from holoviews import streams
+from matplotlib.path import Path as Outline
 
 if __name__ == "__main__":  # plain `python` only builds the page; `panel serve` serves it
     sys.exit("Start it with: panel serve code/figures/figure_2/annotate_detachment.py --port 5006")
@@ -128,7 +129,8 @@ def polygons() -> list[list[list[float]]]:
 
 
 def show(drawn: list | None = None) -> None:
-    """Display section k; with drawn, redisplay it with those polygons instead of the saved ones."""
+    """Display section k; with drawn, redisplay it with those polygons (keeping the current view) instead of the
+    saved ones."""
     k = state["k"]
     if k >= len(order):
         status.object, count.object, plot.object = f"**All {len(order)} sections done.**", "", None
@@ -139,6 +141,7 @@ def show(drawn: list | None = None) -> None:
     if k + 1 < len(order):
         images(k + 1)  # preload the next section
     path = annotation_path(order[k])
+    redisplay = drawn is not None
     if drawn is None:
         drawn = json.loads(path.read_text())["polygons"] if path.exists() else []
     # the plot's y axis points up, image pixels point down: y_plot = h - y_pixel
@@ -148,23 +151,39 @@ def show(drawn: list | None = None) -> None:
     state.update(h=h, draw=streams.FreehandDraw(source=polys))
     streams.PolyEdit(source=polys, vertex_style=corners)
     state["draw"].add_subscriber(lambda **_: count.param.update(object=f"**Polygons on this section: {len(polygons())}**"))
+    streams.DoubleTap(source=polys).add_subscriber(delete_at)
     count.object = f"**Polygons on this section: {len(drawn)}**"
     def add_images(plot, _) -> None:  # the two images, under the polygons, as JPEGs the browser decodes itself
         fig = plot.state
         layers = [fig.image_url(url=[url], x=0, y=h, w=w, h=h, anchor="top_left") for url in (cyt_url, he_url)]
         fig.renderers = layers + [r for r in fig.renderers if r not in layers]
-        state["he_glyph"] = layers[1].glyph
+        state.update(he_glyph=layers[1].glyph, fig=fig)
         set_he_alpha()
 
-    plot.object = polys.opts(xlim=(0, w), ylim=(0, h), data_aspect=1, frame_width=1000, xaxis=None, yaxis=None,
+    # redisplays (undo, delete) keep the current zoom and position; a new section starts with the whole image
+    fig = state.get("fig") if redisplay else None
+    view = dict(xlim=(fig.x_range.start, fig.x_range.end), ylim=(fig.y_range.start, fig.y_range.end)) if fig else \
+        dict(xlim=(0, w), ylim=(0, h))
+    plot.object = polys.opts(**view, data_aspect=1, frame_width=1000, xaxis=None, yaxis=None,
                              active_tools=["freehand_draw", "wheel_zoom"], hooks=[add_images])
     done = "already saved, " if path.exists() else ""
     status.object = (f"**Section {k + 1} of {len(order)}** ({done}{state['saved']} saved this session). "
-                     f"**Click and drag** around a detached area to outline it; click an outline + Backspace to delete.  "
+                     f"**Click and drag** around a detached area to outline it; **double-click** inside an outline to delete it.  "
                      f"\n{KEYS}")
     for button in (save, skip):
         button.disabled = False
     back.disabled = k == 0
+
+
+def delete_at(x: float | None, y: float | None) -> None:
+    """Delete the outlines containing the double-clicked point."""
+    if x is None or y is None:
+        return
+    point = (x, state["h"] - y)  # plot y up -> image pixels y down
+    drawn = polygons()
+    kept = [p for p in drawn if not Outline(p).contains_point(point)]
+    if len(kept) < len(drawn):
+        show(drawn=kept)
 
 
 def set_he_alpha(*_) -> None:
