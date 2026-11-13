@@ -99,15 +99,25 @@ def cytassist_um_per_px(spots: pd.DataFrame) -> float:
     return SPOT_PITCH_UM / float(distance.median())
 
 
+def outline_mask(polygons: list, height: int, width: int) -> np.ndarray:
+    """Union of the filled outlines. Each outline is filled on its own and from its outer edge, so overlapping
+    outlines count once and a self-crossing outline has no holes (filling all at once would leave overlaps empty)."""
+    mask = np.zeros((height, width), np.uint8)
+    for polygon in polygons:
+        one = np.zeros_like(mask)
+        cv2.fillPoly(one, [np.round(np.asarray(polygon)).astype(np.int32)], 1)
+        outer, _ = cv2.findContours(one, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        cv2.drawContours(mask, outer, -1, 1, thickness=cv2.FILLED)
+    return mask
+
+
 def detachment_calls(sample_id: str) -> tuple[pd.DataFrame, dict]:
     sample_dir = cohort_dir("spaceranger", sample_id) / sample_id
     spots = read_cytassist_coords(sample_id, read_spots(sample_dir))
     height, width = read_cytassist_image(sample_id).shape[:2]
     polygons = json.loads(annotation_path(sample_id).read_text())["polygons"]
 
-    mask = np.zeros((height, width), np.uint8)
-    if polygons:
-        cv2.fillPoly(mask, [np.round(np.asarray(p)).astype(np.int32) for p in polygons], 1)
+    mask = outline_mask(polygons, height, width)
     x = spots["cyt_x"].round().to_numpy()
     y = spots["cyt_y"].round().to_numpy()
     on_image = np.isfinite(x) & np.isfinite(y) & (x >= 0) & (x < width) & (y >= 0) & (y < height)
