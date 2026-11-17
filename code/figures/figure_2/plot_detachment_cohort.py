@@ -29,7 +29,7 @@ import yaml
 from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
 from scipy.sparse import csc_matrix
-from scipy.stats import mannwhitneyu
+from scipy.stats import bootstrap, mannwhitneyu
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_detachment_pipeline import MATRIX_NAME, SAMPLES, cohort_dir
@@ -72,6 +72,11 @@ def apply_style() -> None:
     )
 
 
+def hodges_lehmann(a: np.ndarray, b: np.ndarray) -> float:
+    """Median of all pairwise differences b - a (STAY - standard), the effect size that goes with Mann-Whitney U."""
+    return float(np.median(np.subtract.outer(b, a)))
+
+
 def mannwhitney(a: pd.Series, b: pd.Series) -> dict:
     a = a.dropna()
     b = b.dropna()
@@ -83,8 +88,14 @@ def mannwhitney(a: pd.Series, b: pd.Series) -> dict:
             "median_STAY": float(b.median()) if len(b) else np.nan,
             "U": np.nan,
             "p": np.nan,
+            "delta": np.nan,
+            "ci_low": np.nan,
+            "ci_high": np.nan,
         }
     stat, p = mannwhitneyu(a, b, alternative="two-sided")
+    # 95% CI of the Hodges-Lehmann difference: percentile bootstrap, resampling sections within each cohort
+    ci = bootstrap((a.to_numpy(), b.to_numpy()), lambda x, y: hodges_lehmann(x, y), vectorized=False,
+                   n_resamples=10000, method="percentile", random_state=0).confidence_interval
     return {
         "n_standard": int(len(a)),
         "n_STAY": int(len(b)),
@@ -92,6 +103,9 @@ def mannwhitney(a: pd.Series, b: pd.Series) -> dict:
         "median_STAY": float(b.median()),
         "U": float(stat),
         "p": float(p),
+        "delta": hodges_lehmann(a.to_numpy(), b.to_numpy()),
+        "ci_low": float(ci.low),
+        "ci_high": float(ci.high),
     }
 
 
@@ -113,6 +127,18 @@ def format_p(p: float) -> str:
     if p < 0.001:
         return "p < 0.001"
     return f"p = {p:.3g}"
+
+
+def format_num(x: float) -> str:
+    """Three significant digits without scientific notation; minus sign as in print."""
+    if not np.isfinite(x):
+        return "NA"
+    digits = max(0, 2 - int(np.floor(np.log10(abs(x))))) if x else 0
+    return f"{x:,.{digits}f}".replace("-", "\u2212")
+
+
+def format_delta(st: dict) -> str:
+    return f"Δ {format_num(st['delta'])} [{format_num(st['ci_low'])}, {format_num(st['ci_high'])}]"
 
 
 def style_ax(ax: plt.Axes) -> None:
@@ -248,6 +274,9 @@ def build_cohort_summary(per_sample: pd.DataFrame) -> pd.DataFrame:
                     "metric": metric,
                     "cohort": cohort,
                     **describe_stats(per_sample.loc[per_sample["cohort"] == cohort, metric]),
+                    "delta_STAY_minus_standard": stats["delta"],
+                    "delta_ci95_low": stats["ci_low"],
+                    "delta_ci95_high": stats["ci_high"],
                     "p_value": stats["p"],
                     "p_stars": p_to_stars(stats["p"]),
                 }
@@ -289,7 +318,7 @@ def plot_cohort_panel(
     add_bracket(ax, positions[0], positions[1], y, 0.03 * (y1 - y0), stats["p"])
     ax.set_xticks(positions, cohort_xtick_labels(summaries))
     ax.set_ylabel(ylabel)
-    ax.set_title(f"{title}\nMann–Whitney U, {format_p(stats['p'])}", pad=8)
+    ax.set_title(f"{title}\n{format_delta(stats)}\n{format_p(stats['p'])}", pad=8)
     if show_legend:
         ax.legend(handles=cohort_legend(), frameon=False, loc="best", fontsize=6.5)
     style_ax(ax)
@@ -334,7 +363,7 @@ def plot_compartment_panel(ax: plt.Axes, comp_df: pd.DataFrame) -> pd.DataFrame:
             ymax = float(comp_df.loc[comp_df["compartment"] == st["compartment"], "detachment_rate_pct"].max())
             ax.text(base_x[i], ymax + 0.04 * (y1 - y0 + 1e-9), st["stars"], ha="center", va="bottom", fontsize=7)
 
-    ax.set_xticks(base_x, compartments)
+    ax.set_xticks(base_x, [f"{st['compartment']}\n{format_delta(st)}" for st in stats_rows])
     ax.set_ylabel("Detached spots (%)")
     ax.set_title("Detachment by compartment", pad=8)
     ax.legend(handles=cohort_legend(), frameon=False, loc="upper left", fontsize=6.5)
