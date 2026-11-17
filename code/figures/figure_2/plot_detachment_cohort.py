@@ -356,13 +356,16 @@ def plot_compartment_panel(ax: plt.Axes, comp_df: pd.DataFrame) -> pd.DataFrame:
         )
         stats_rows.append({"compartment": comp, **st, "stars": p_to_stars(st["p"])})
 
+    # a bracket with stars over each compartment's pair of boxes, as in the other panels
     y0, y1 = ax.get_ylim()
     for i, st in enumerate(stats_rows):
         if np.isfinite(st["p"]):
             ymax = float(comp_df.loc[comp_df["compartment"] == st["compartment"], "detachment_rate_pct"].max())
-            ax.text(base_x[i], ymax + 0.04 * (y1 - y0 + 1e-9), st["stars"], ha="center", va="bottom", fontsize=7)
-
-    ax.set_xticks(base_x, [f"{st['compartment']}\n{format_delta(st)}" for st in stats_rows])
+            add_bracket(ax, base_x[i] + offsets[COHORT_ORDER[0]], base_x[i] + offsets[COHORT_ORDER[1]],
+                        ymax + 0.04 * (y1 - y0), 0.03 * (y1 - y0), st["p"])
+    # effect size, CI and p stacked under each compartment name, so neighbouring labels cannot overlap
+    ax.set_xticks(base_x, [f"{st['compartment']}\n{format_delta(st).replace(' [', chr(10) + '[')}\n{format_p(st['p'])}"
+                           for st in stats_rows], fontsize=6)
     ax.set_ylabel("Detached spots (%)")
     ax.set_title("Detachment by compartment", pad=14)
     style_ax(ax)
