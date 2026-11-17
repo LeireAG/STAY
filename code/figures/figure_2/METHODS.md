@@ -1,7 +1,5 @@
 # Methods: Figure 2 (STAY vs standard detachment)
 
-Items in **[brackets]** are still to be filled in.
-
 ## Detachment annotation
 
 Tissue detachment was annotated manually on the CytAssist images of all STAY (n = 33) and standard (n = 20) sections. For each section, the CytAssist image from the Space Ranger output (**[Space Ranger version]**) was displayed together with the high-resolution H&E image. The H&E was registered onto the CytAssist image by an affine transformation, estimated with RANSAC from the positions of the Visium spots in both images: the H&E spot coordinates from Space Ranger, and the CytAssist spot coordinates from the manual Loupe Browser alignment. This registration was used only to display the two images together. The H&E could be overlaid on the CytAssist image with adjustable opacity, so tissue present before processing (H&E) could be compared directly with the tissue remaining on the slide (CytAssist).
