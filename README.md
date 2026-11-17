@@ -60,7 +60,7 @@ In R, load the environment with `renv::load("environment")` before running a not
 4. `03_loading_reviewed_path_annotation copy.Rmd`: adds the pathology annotations (Figure 3 C/F, Figure 6 J/K, Supplementary Data 1).
 5. `04_QC_normalization_scaling.Rmd`: QC, normalization and scaling (Figure 6F). Run it on `paired_object.rds` to create `vis_mod_norm.rds`, which the Figure 6 notebook needs.
 
-**Figure 2 (STAY vs standard)**: detachment is annotated manually on the CytAssist images, blinded to sample and cohort; paths are in `resources/detachment.yaml`.
+**Figure 2 (STAY vs standard)**: detachment is annotated manually on the CytAssist images, blinded to sample and cohort; paths are in `resources/detachment.yaml`. Methods: [`code/figures/figure_2/METHODS.md`](code/figures/figure_2/METHODS.md).
 
 ```bash
 conda activate stay-python
