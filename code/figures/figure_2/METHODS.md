@@ -28,4 +28,4 @@ The primary outcome was the detachment rate. Detached area, compartment-specific
 
 ## Software
 
-Analyses were done in Python **[3.11]** with NumPy, pandas, SciPy (**[version]**), OpenCV, h5py, Panel and HoloViews; the environment is `environment/stay-python.yaml`. The code is available at **[repository URL / DOI]**.
+Analyses were done in Python 3.11.18 with NumPy 2.4.6, pandas 2.3.3, SciPy 1.17.1, OpenCV 4.12.0, h5py 3.16.0, Scanpy 1.11.5, AnnData 0.12.19 and Matplotlib 3.11.2; the annotation viewer used Panel 1.9.4 and HoloViews 1.23.2. The environment is `environment/stay-python.yaml`. The code is available at **[repository URL / DOI]**.
