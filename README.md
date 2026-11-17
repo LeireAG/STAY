@@ -12,7 +12,7 @@ data/                # not tracked by git: download the data into the matching f
   raw_data/                    # FASTQs, H&E/CytAssist images, Loupe alignments
   spaceranger/                 # Space Ranger outs/ per sample
   histopathology_annotation/   # QuPath GeoJSON + spot-level CSVs
-  analysis/                    # intermediate results (detachment scores, cropped images)
+  analysis/                    # intermediate results (detachment annotations and calls, cropped images)
   r_objects/                   # Seurat/semla .rds objects
 environment/         # conda env (Python) and renv (R)
 resources/           # sample list and Figure 2 config
@@ -44,7 +44,7 @@ The final R objects are provided, so the figure scripts can run without redoing 
 ## Setup
 
 ```bash
-conda env create -f environment/detachment-score.yaml    # Python (Figure 2)
+conda env create -f environment/stay-python.yaml         # all Python scripts
 Rscript -e 'renv::restore(project = "environment")'      # R packages
 ```
 
@@ -60,11 +60,12 @@ In R, load the environment with `renv::load("environment")` before running a not
 4. `03_loading_reviewed_path_annotation copy.Rmd`: adds the pathology annotations (Figure 3 C/F, Figure 6 J/K, Supplementary Data 1).
 5. `04_QC_normalization_scaling.Rmd`: QC, normalization and scaling (Figure 6F). Run it on `paired_object.rds` to create `vis_mod_norm.rds`, which the Figure 6 notebook needs.
 
-**Figure 2 (STAY vs standard)**: settings are in `resources/detachment.yaml`.
+**Figure 2 (STAY vs standard)**: detachment is annotated manually on the CytAssist images, blinded to sample and cohort; paths are in `resources/detachment.yaml`. Methods: [`code/figures/figure_2/METHODS.md`](code/figures/figure_2/METHODS.md).
 
 ```bash
-conda activate detachment-score
-python code/figures/figure_2/run_detachment_pipeline.py   # per-spot detachment scores
+conda activate stay-python
+panel serve code/figures/figure_2/annotate_detachment.py --port 5006   # laptop: ssh -N -L 5006:localhost:5006 <server>, open localhost:5006/annotate_detachment
+python code/figures/figure_2/run_detachment_pipeline.py   # per-spot detachment calls and detached area
 python code/figures/figure_2/plot_detachment_cohort.py    # cohort plots and statistics
 python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial panels
 ```
@@ -72,7 +73,7 @@ python code/figures/figure_2/plot_detachment_spatial.py   # per-sample spatial p
 **H&E image quality (paired STAY vs standard)**: basic metrics (contrast, entropy, sharpness, GLCM texture, colour) over the whole raw H&E image of each paired section, with every image rescaled to the coarsest pixel size (0.443 µm/px).
 
 ```bash
-conda activate detachment-score
+conda activate stay-python
 python code/figures/he_quality/he_metadata.py       # TIFF metadata of the H&E and CytAssist images (fast)
 python code/figures/he_quality/he_quality.py        # metrics per image (slow, needs the raw images)
 python code/figures/he_quality/plot_he_quality.py   # comparison and figure from the metrics CSV

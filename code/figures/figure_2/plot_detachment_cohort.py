@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Single composite cohort figure for detachment and QC metrics.
 
-Outputs one PDF/PNG with:
-  - sample-level detachment rate by cohort
+Reads the manual detachment calls of run_detachment_pipeline.py. Tissue spots are Space Ranger's in_tissue spots
+plus detached spots outside that mask. Outputs one PDF/PNG with:
+  - sample-level detachment rate (detached / tissue spots) and annotated detached area by cohort
   - unique genes, UMI count, and % mitochondrial reads by cohort
   - detachment rate by epithelial vs non-epithelial compartment
   - sample counts shown on cohort x-axis labels
@@ -25,10 +26,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
-from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
 from scipy.sparse import csc_matrix
-from scipy.stats import mannwhitneyu
+from scipy.stats import bootstrap, mannwhitneyu
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from run_detachment_pipeline import MATRIX_NAME, SAMPLES, cohort_dir
@@ -40,9 +40,6 @@ RESULTS_DIR = PROJECT_ROOT / CFG["paths"]["results"]
 COHORT_COLORS = CFG["colors"]["cohort"]
 COHORT_ORDER = ["standard", "STAY"]
 COHORT_LABELS = {"standard": "standard", "STAY": "STAY"}
-SCORE_THRES = float(CFG["scoring"]["score_thres"])
-SCORE_MAD_THRES = float(CFG["scoring"]["score_mad_thres"])
-MIN_SPOTS = int(CFG["scoring"]["min_spots"])
 
 BOXPLOT_STYLE = dict(
     patch_artist=True,
@@ -74,28 +71,9 @@ def apply_style() -> None:
     )
 
 
-def detachment_threshold(values: pd.Series) -> float:
-    if not len(values):
-        return np.nan
-    median = float(values.median())
-    mad = float(np.median(np.abs(values - median))) * 1.4826
-    return max(SCORE_THRES, median + SCORE_MAD_THRES * mad)
-
-
-def assign_detached(scores: pd.Series) -> pd.Series:
-    values = pd.to_numeric(scores, errors="coerce")
-    threshold = detachment_threshold(values.dropna())
-    called = (values >= threshold).fillna(False)
-    if int(called.sum()) < MIN_SPOTS:
-        return pd.Series(False, index=scores.index)
-    return called
-
-
-def call_rate(scores: pd.Series) -> tuple[float, float, int]:
-    values = pd.to_numeric(scores, errors="coerce").dropna()
-    n_high = int(assign_detached(scores).sum())
-    threshold = detachment_threshold(values)
-    return 100.0 * n_high / len(values), threshold, n_high
+def hodges_lehmann(a: np.ndarray, b: np.ndarray) -> float:
+    """Median of all pairwise differences b - a (STAY - standard), the effect size that goes with Mann-Whitney U."""
+    return float(np.median(np.subtract.outer(b, a)))
 
 
 def mannwhitney(a: pd.Series, b: pd.Series) -> dict:
@@ -109,8 +87,14 @@ def mannwhitney(a: pd.Series, b: pd.Series) -> dict:
             "median_STAY": float(b.median()) if len(b) else np.nan,
             "U": np.nan,
             "p": np.nan,
+            "delta": np.nan,
+            "ci_low": np.nan,
+            "ci_high": np.nan,
         }
     stat, p = mannwhitneyu(a, b, alternative="two-sided")
+    # 95% CI of the Hodges-Lehmann difference: percentile bootstrap, resampling sections within each cohort
+    ci = bootstrap((a.to_numpy(), b.to_numpy()), lambda x, y: hodges_lehmann(x, y), vectorized=False,
+                   n_resamples=10000, method="percentile", random_state=0).confidence_interval
     return {
         "n_standard": int(len(a)),
         "n_STAY": int(len(b)),
@@ -118,6 +102,9 @@ def mannwhitney(a: pd.Series, b: pd.Series) -> dict:
         "median_STAY": float(b.median()),
         "U": float(stat),
         "p": float(p),
+        "delta": hodges_lehmann(a.to_numpy(), b.to_numpy()),
+        "ci_low": float(ci.low),
+        "ci_high": float(ci.high),
     }
 
 
@@ -139,6 +126,18 @@ def format_p(p: float) -> str:
     if p < 0.001:
         return "p < 0.001"
     return f"p = {p:.3g}"
+
+
+def format_num(x: float) -> str:
+    """Three significant digits without scientific notation; minus sign as in print."""
+    if not np.isfinite(x):
+        return "NA"
+    digits = max(0, 2 - int(np.floor(np.log10(abs(x))))) if x else 0
+    return f"{x:,.{digits}f}".replace("-", "\u2212")
+
+
+def format_delta(st: dict) -> str:
+    return f"Δ {format_num(st['delta'])} [{format_num(st['ci_low'])}, {format_num(st['ci_high'])}]"
 
 
 def style_ax(ax: plt.Axes) -> None:
@@ -185,28 +184,31 @@ def read_spot_metrics(sample_id: str, barcodes: pd.Series) -> pd.DataFrame:
     return df.loc[df["barcode"].isin(barcodes_str)].copy()
 
 
+def read_detached_area() -> pd.DataFrame:
+    paths = {PROJECT_ROOT / CFG["paths"]["detachment"].format(cohort=c) / "detached_area.csv" for c in SAMPLES["cohort"]}
+    return pd.concat([pd.read_csv(p, dtype={"sample_id": str}) for p in paths]).set_index("sample_id")
+
+
 def load_summaries() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Per-sample and per-(sample, compartment) detachment/QC summaries."""
-    samples = SAMPLES
+    areas = read_detached_area()
     sample_rows = []
     comp_rows = []
-    for _, row in samples.iterrows():
+    for _, row in SAMPLES.iterrows():
         sample_id = str(row["sample_id"])
         cohort = str(row["cohort"])
-        scores = pd.read_csv(cohort_dir("detachment_score", sample_id) / f"{sample_id}.csv")
-        scores["barcode"] = scores["barcode"].astype(str)
-        scores["detachment_score"] = pd.to_numeric(scores["detachment_score"], errors="coerce")
-        scores["detached"] = assign_detached(scores["detachment_score"])
-        rate, threshold, n_high = call_rate(scores["detachment_score"])
-        metrics = read_spot_metrics(sample_id, scores["barcode"])
+        calls = pd.read_csv(cohort_dir("detachment", sample_id) / f"{sample_id}.csv", dtype={"barcode": str})
+        tissue = calls.loc[calls["tissue"]]
+        n_detached = int(tissue["detached"].sum())
+        metrics = read_spot_metrics(sample_id, tissue["barcode"])
         sample_rows.append(
             {
                 "sample_id": sample_id,
                 "cohort": cohort,
-                "n_spots": int(scores["detachment_score"].notna().sum()),
-                "n_detached": n_high,
-                "detachment_rate_pct": rate,
-                "threshold": threshold,
+                "n_spots": len(tissue),
+                "n_detached": n_detached,
+                "detachment_rate_pct": 100.0 * n_detached / len(tissue),
+                "detached_area_mm2": float(areas.loc[sample_id, "detached_area_mm2"]),
                 "median_n_genes": float(metrics["n_genes"].median()),
                 "median_total_counts": float(metrics["total_counts"].median()),
                 "median_pct_mt": float(metrics["pct_mt"].median()),
@@ -217,11 +219,11 @@ def load_summaries() -> tuple[pd.DataFrame, pd.DataFrame]:
         if epi_path.exists():
             epi = pd.read_csv(epi_path)
             epi["barcode"] = epi["barcode"].astype(str)
-            epi = epi[epi["barcode"].isin(scores["barcode"])]
+            epi = epi[epi["barcode"].isin(tissue["barcode"])]
         else:
             epi = pd.DataFrame({"barcode": [], "annotation": []})
 
-        merged = scores[["barcode", "detached"]].merge(epi, on="barcode", how="left")
+        merged = tissue[["barcode", "detached"]].merge(epi, on="barcode", how="left")
         merged["compartment"] = np.where(merged["annotation"].notna(), "epithelial", "non-epithelial")
         for comp, sub in merged.groupby("compartment", sort=False):
             comp_rows.append(
@@ -252,6 +254,7 @@ def describe_stats(values: pd.Series) -> dict:
 def build_cohort_summary(per_sample: pd.DataFrame) -> pd.DataFrame:
     metrics = [
         "detachment_rate_pct",
+        "detached_area_mm2",
         "median_n_genes",
         "median_total_counts",
         "median_pct_mt",
@@ -270,6 +273,9 @@ def build_cohort_summary(per_sample: pd.DataFrame) -> pd.DataFrame:
                     "metric": metric,
                     "cohort": cohort,
                     **describe_stats(per_sample.loc[per_sample["cohort"] == cohort, metric]),
+                    "delta_STAY_minus_standard": stats["delta"],
+                    "delta_ci95_low": stats["ci_low"],
+                    "delta_ci95_high": stats["ci_high"],
                     "p_value": stats["p"],
                     "p_stars": p_to_stars(stats["p"]),
                 }
@@ -311,7 +317,7 @@ def plot_cohort_panel(
     add_bracket(ax, positions[0], positions[1], y, 0.03 * (y1 - y0), stats["p"])
     ax.set_xticks(positions, cohort_xtick_labels(summaries))
     ax.set_ylabel(ylabel)
-    ax.set_title(f"{title}\nMann–Whitney U, {format_p(stats['p'])}", pad=8)
+    ax.set_title(f"{title}\n{format_delta(stats)}\n{format_p(stats['p'])}", pad=8)
     if show_legend:
         ax.legend(handles=cohort_legend(), frameon=False, loc="best", fontsize=6.5)
     style_ax(ax)
@@ -350,16 +356,18 @@ def plot_compartment_panel(ax: plt.Axes, comp_df: pd.DataFrame) -> pd.DataFrame:
         )
         stats_rows.append({"compartment": comp, **st, "stars": p_to_stars(st["p"])})
 
+    # a bracket with stars over each compartment's pair of boxes, as in the other panels
     y0, y1 = ax.get_ylim()
     for i, st in enumerate(stats_rows):
         if np.isfinite(st["p"]):
             ymax = float(comp_df.loc[comp_df["compartment"] == st["compartment"], "detachment_rate_pct"].max())
-            ax.text(base_x[i], ymax + 0.04 * (y1 - y0 + 1e-9), st["stars"], ha="center", va="bottom", fontsize=7)
-
-    ax.set_xticks(base_x, compartments)
+            add_bracket(ax, base_x[i] + offsets[COHORT_ORDER[0]], base_x[i] + offsets[COHORT_ORDER[1]],
+                        ymax + 0.04 * (y1 - y0), 0.03 * (y1 - y0), st["p"])
+    # effect size, CI and p stacked under each compartment name, so neighbouring labels cannot overlap
+    ax.set_xticks(base_x, [f"{st['compartment']}\n{format_delta(st).replace(' [', chr(10) + '[')}\n{format_p(st['p'])}"
+                           for st in stats_rows], fontsize=6)
     ax.set_ylabel("Detached spots (%)")
-    ax.set_title("Detachment by compartment", pad=8)
-    ax.legend(handles=cohort_legend(), frameon=False, loc="upper left", fontsize=6.5)
+    ax.set_title("Detachment by compartment", pad=14)
     style_ax(ax)
     return pd.DataFrame(stats_rows)
 
@@ -378,27 +386,9 @@ def main() -> None:
     per_sample.to_csv(RESULTS_DIR / "detachment_per_sample_summary.csv", index=False)
     build_cohort_summary(per_sample).to_csv(RESULTS_DIR / "detachment_cohort_summary.csv", index=False)
 
-    fig = plt.figure(figsize=(8.6, 6.0))
-    gs = GridSpec(
-        2,
-        8,
-        figure=fig,
-        height_ratios=[1.45, 1.0],
-        hspace=0.58,
-        wspace=0.40,
-        top=0.96,
-        bottom=0.11,
-        left=0.07,
-        right=0.99,
-    )
-
-    ax_rate = fig.add_subplot(gs[0, 0:2])
-    ax_genes = fig.add_subplot(gs[0, 2:4])
-    ax_umi = fig.add_subplot(gs[0, 4:6])
-    ax_mt = fig.add_subplot(gs[0, 6:8])
-    ax_comp = fig.add_subplot(gs[1, 0:3])
-    comp_pos = ax_comp.get_position()
-    ax_comp.set_position([comp_pos.x0, comp_pos.y0, comp_pos.width * 0.7, comp_pos.height])
+    # row 1: detachment; row 2: QC metrics
+    fig, ((ax_rate, ax_area, ax_comp), (ax_genes, ax_umi, ax_mt)) = plt.subplots(2, 3, figsize=(7.2, 6.0))
+    fig.subplots_adjust(hspace=0.75, wspace=0.55, top=0.9, bottom=0.12, left=0.09, right=0.99)
 
     plot_cohort_panel(
         ax_rate,
@@ -407,6 +397,13 @@ def main() -> None:
         "Detached spots (%)",
         "Detachment rate",
         show_legend=True,
+    )
+    plot_cohort_panel(
+        ax_area,
+        summaries,
+        "detached_area_mm2",
+        "Detached area (mm²)",
+        "Detached area",
     )
     plot_cohort_panel(
         ax_genes,
