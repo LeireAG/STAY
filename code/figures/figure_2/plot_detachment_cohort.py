@@ -26,7 +26,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import yaml
-from matplotlib.gridspec import GridSpec
 from matplotlib.patches import Patch
 from scipy.sparse import csc_matrix
 from scipy.stats import bootstrap, mannwhitneyu
@@ -365,8 +364,7 @@ def plot_compartment_panel(ax: plt.Axes, comp_df: pd.DataFrame) -> pd.DataFrame:
 
     ax.set_xticks(base_x, [f"{st['compartment']}\n{format_delta(st)}" for st in stats_rows])
     ax.set_ylabel("Detached spots (%)")
-    ax.set_title("Detachment by compartment", pad=8)
-    ax.legend(handles=cohort_legend(), frameon=False, loc="upper left", fontsize=6.5)
+    ax.set_title("Detachment by compartment", pad=14)
     style_ax(ax)
     return pd.DataFrame(stats_rows)
 
@@ -385,28 +383,9 @@ def main() -> None:
     per_sample.to_csv(RESULTS_DIR / "detachment_per_sample_summary.csv", index=False)
     build_cohort_summary(per_sample).to_csv(RESULTS_DIR / "detachment_cohort_summary.csv", index=False)
 
-    fig = plt.figure(figsize=(10.6, 6.0))
-    gs = GridSpec(
-        2,
-        10,
-        figure=fig,
-        height_ratios=[1.45, 1.0],
-        hspace=0.58,
-        wspace=0.40,
-        top=0.96,
-        bottom=0.11,
-        left=0.07,
-        right=0.99,
-    )
-
-    ax_rate = fig.add_subplot(gs[0, 0:2])
-    ax_area = fig.add_subplot(gs[0, 2:4])
-    ax_genes = fig.add_subplot(gs[0, 4:6])
-    ax_umi = fig.add_subplot(gs[0, 6:8])
-    ax_mt = fig.add_subplot(gs[0, 8:10])
-    ax_comp = fig.add_subplot(gs[1, 0:3])
-    comp_pos = ax_comp.get_position()
-    ax_comp.set_position([comp_pos.x0, comp_pos.y0, comp_pos.width * 0.7, comp_pos.height])
+    # row 1: detachment; row 2: QC metrics
+    fig, ((ax_rate, ax_area, ax_comp), (ax_genes, ax_umi, ax_mt)) = plt.subplots(2, 3, figsize=(7.2, 6.0))
+    fig.subplots_adjust(hspace=0.75, wspace=0.55, top=0.9, bottom=0.12, left=0.09, right=0.99)
 
     plot_cohort_panel(
         ax_rate,
