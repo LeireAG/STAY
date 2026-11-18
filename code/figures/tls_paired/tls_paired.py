@@ -2,9 +2,9 @@
 """TLS score of the paired STAY and standard sections, mapped on the H&E.
 
 TLS model of Andersson et al. (2021), https://doi.org/10.1038/s41467-021-26271-2 (adapted from
-https://github.com/almaan/her2st/blob/master/scripts/predict.py): counts of the tissue spots normalised to 10,000 per
-spot and log1p-transformed, then each spot divided by its total and each gene by its standard deviation across spots,
-and the dot product taken with the model coefficients (resources/gene_lists/andersson_2021_coef_full_visium.csv).
+https://github.com/almaan/her2st/blob/master/scripts/predict.py): tissue spots with >= MIN_GENES detected genes, counts
+normalised to 10,000 per spot and log1p-transformed, then each spot divided by its total and each gene by its standard
+deviation across spots, and the dot product taken with the model coefficients (resources/gene_lists/andersson_2021_coef_full_visium.csv).
 
 For every paired section in resources/sample_list.csv, writes data/analysis/paired/tls/<sample_id>.csv (barcode,
 TLS_score) and results/tls_paired/<sample_id>.pdf: spots with TLS score > TLS_THRESHOLD on the H&E (sc.pl.spatial).
@@ -31,6 +31,7 @@ RESULTS = PROJECT_ROOT / "results/tls_paired"
 COEFS = PROJECT_ROOT / "resources/gene_lists/andersson_2021_coef_full_visium.csv"
 SAMPLES = pd.read_csv(PROJECT_ROOT / "resources/sample_list.csv").query("cohort == 'paired'")["sample_id"]
 
+MIN_GENES = 1000  # spots with fewer detected genes are left out, before normalisation
 TLS_THRESHOLD = 0.01  # TLS-high cut-off: spots above it are shown
 SPOT_SCALE = 1.6  # spots drawn 1.6x their 55 um diameter (88 um, below the 100 um spacing) so they read at panel size
 
@@ -39,7 +40,7 @@ def read_section(sample_id: str):
     """Tissue spots with the cropped hires H&E and the matching (shifted) spot positions."""
     adata = sc.read_10x_h5(SPACERANGER / sample_id / "filtered_feature_bc_matrix.h5")
     adata.var_names_make_unique()
-    sc.pp.filter_cells(adata, min_counts=1)
+    sc.pp.filter_cells(adata, min_genes=MIN_GENES)
     spots = pd.read_csv(CROPPED / sample_id / "tissue_positions_shifted.csv", index_col="barcode")
     adata.obsm["spatial"] = spots.loc[adata.obs_names, ["pxl_col_in_fullres", "pxl_row_in_fullres"]].to_numpy()
     adata.uns["spatial"] = {sample_id: {
