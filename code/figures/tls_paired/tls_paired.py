@@ -32,7 +32,6 @@ COEFS = PROJECT_ROOT / "resources/gene_lists/andersson_2021_coef_full_visium.csv
 SAMPLES = pd.read_csv(PROJECT_ROOT / "resources/sample_list.csv").query("cohort == 'paired'")["sample_id"]
 
 TLS_THRESHOLD = 0.01  # TLS-high cut-off: spots above it are shown
-VMAX = 0.05  # top of the colour scale, the same for all sections
 SPOT_SCALE = 1.6  # spots drawn 1.6x their 55 um diameter (88 um, below the 100 um spacing) so they read at panel size
 
 
@@ -78,13 +77,14 @@ def main() -> None:
         adata.obs["TLS_score"].rename_axis("barcode").to_csv(CROPPED / "tls" / f"{sample_id}.csv")
 
         adata.obs["TLS score"] = adata.obs["TLS_score"].where(adata.obs["TLS_score"] > TLS_THRESHOLD)  # others hidden
+        lo, hi = adata.obs["TLS score"].min(), adata.obs["TLS score"].max()  # colour scale of this section
         with plt.rc_context({"font.size": 7, "axes.titlesize": 8}):
             fig, ax = plt.subplots(figsize=(2.4, 2.2))
-            sc.pl.spatial(adata, color="TLS score", vmin=0, vmax=VMAX, na_color=(0, 0, 0, 0), ax=ax, show=False,
+            sc.pl.spatial(adata, color="TLS score", vmin=lo, vmax=hi, na_color=(0, 0, 0, 0), ax=ax, show=False,
                           title=sample_id.replace("_", " "), alpha_img=0.6, size=SPOT_SCALE, frameon=False,
                           colorbar_loc=None)
-            fig.colorbar(plt.cm.ScalarMappable(plt.Normalize(0, VMAX), "viridis"), ax=ax, shrink=0.5, aspect=10,
-                         ticks=[0, VMAX], label="TLS score")
+            fig.colorbar(plt.cm.ScalarMappable(plt.Normalize(lo, hi), "viridis"), ax=ax, shrink=0.5, aspect=10,
+                         ticks=[lo, hi], format="%.3f", label="TLS score")
             fig.savefig(RESULTS / f"{sample_id}.pdf", bbox_inches="tight", dpi=300)
             plt.close(fig)
     print(f"wrote {RESULTS}")
