@@ -71,16 +71,20 @@ def tls_score(adata) -> np.ndarray:
 def main() -> None:
     (CROPPED / "tls").mkdir(parents=True, exist_ok=True)
     RESULTS.mkdir(parents=True, exist_ok=True)
+    sections = {}
     for sample_id in SAMPLES:
         print(sample_id, end=": ", flush=True)
         adata = read_section(sample_id)
         adata.obs["TLS_score"] = tls_score(adata)
         adata.obs["TLS_score"].rename_axis("barcode").to_csv(CROPPED / "tls" / f"{sample_id}.csv")
-
         adata.obs["TLS score"] = adata.obs["TLS_score"].where(adata.obs["TLS_score"] > TLS_THRESHOLD)  # others hidden
-        # colour scale of this section: shown spots, top capped at the 99th percentile so a few extreme spots don't
-        # wash out the rest (spots above it get the top colour)
-        lo, hi = adata.obs["TLS score"].min(), adata.obs["TLS score"].quantile(0.99)
+        sections[sample_id] = adata
+
+    # one colour scale for all sections: shown spots, top capped at the 99th percentile so a few extreme spots don't
+    # wash out the rest (spots above it get the top colour)
+    shown = pd.concat([adata.obs["TLS score"] for adata in sections.values()])
+    lo, hi = shown.min(), shown.quantile(0.99)
+    for sample_id, adata in sections.items():
         with plt.rc_context({"font.size": 7, "axes.titlesize": 8}):
             fig, ax = plt.subplots(figsize=(2.4, 2.2))
             sc.pl.spatial(adata, color="TLS score", vmin=lo, vmax=hi, na_color=(0, 0, 0, 0), ax=ax, show=False,
