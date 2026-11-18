@@ -81,7 +81,7 @@ python code/figures/he_quality/he_crops.py           # thumbnails and crops (slo
 python code/figures/he_quality/plot_he_overview.py  # one figure with all sections and crops
 ```
 
-**TLS score (paired STAY vs standard)**: TLS model of Andersson et al. (2021), coefficients in `resources/gene_lists/`; Patients 4 and 3, spots with TLS score > 0.01 on the H&E.
+**TLS score (paired STAY vs standard)**: TLS model of Andersson et al. (2021), coefficients in `resources/gene_lists/`; one map per paired section (spots with TLS score > 0.01 on the cropped H&E, `sc.pl.spatial`).
 
 ```bash
 conda activate stay-python
