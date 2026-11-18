@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SPACERANGER = PROJECT_ROOT / "data/spaceranger/paired"
@@ -34,6 +35,8 @@ SAMPLES = pd.read_csv(PROJECT_ROOT / "resources/sample_list.csv").query("cohort 
 MIN_GENES = 1000  # spots with fewer detected genes are left out, before normalisation
 TLS_THRESHOLD = 0.01  # TLS-high cut-off: spots above it are shown
 SPOT_SCALE = 1.6  # spots drawn 1.6x their 55 um diameter (88 um, below the 100 um spacing) so they read at panel size
+SPOT_DIAMETER_UM = 55  # Visium spot diameter, the ruler for the scale bar
+SCALEBAR_UM = 500
 
 
 def read_section(sample_id: str):
@@ -90,8 +93,14 @@ def main() -> None:
             sc.pl.spatial(adata, color="TLS score", vmin=lo, vmax=hi, na_color=(0, 0, 0, 0), ax=ax, show=False,
                           title=sample_id.replace("_", " "), alpha_img=0.6, size=SPOT_SCALE, frameon=False,
                           colorbar_loc=None)
-            fig.colorbar(plt.cm.ScalarMappable(plt.Normalize(lo, hi), "viridis"), ax=ax, shrink=0.5, aspect=10,
-                         ticks=[lo, hi], format="%.3f", label="TLS score")
+            cbar = fig.colorbar(plt.cm.ScalarMappable(plt.Normalize(lo, hi), "viridis"), ax=ax, shrink=0.5, aspect=10,
+                                ticks=[lo, hi], format="%.3f", label="TLS score")
+            # scale bar under the colour bar, in hires pixels: µm per full-res pixel from the 55 µm spot diameter
+            scale = adata.uns["spatial"][sample_id]["scalefactors"]
+            px = SCALEBAR_UM * scale["spot_diameter_fullres"] / SPOT_DIAMETER_UM * scale["tissue_hires_scalef"]
+            ax.add_artist(AnchoredSizeBar(ax.transData, px, f"{SCALEBAR_UM} µm", loc="upper left", frameon=False,
+                                          size_vertical=0, bbox_to_anchor=(0, -0.08), bbox_transform=cbar.ax.transAxes,
+                                          borderpad=0, sep=2))
             fig.savefig(RESULTS / f"{sample_id}.pdf", bbox_inches="tight", dpi=300)
             plt.close(fig)
     print(f"wrote {RESULTS}")
