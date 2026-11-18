@@ -15,7 +15,7 @@ data/                # not tracked by git: download the data into the matching f
   analysis/                    # intermediate results (detachment annotations and calls, cropped images)
   r_objects/                   # Seurat/semla .rds objects
 environment/         # conda env (Python) and renv (R)
-resources/           # sample list and Figure 2 config
+resources/           # sample list, Figure 2 config, TLS model coefficients
 results/             # figure outputs, created by the scripts
 ```
 
@@ -79,6 +79,13 @@ python code/figures/he_quality/he_quality.py        # metrics per image (slow, n
 python code/figures/he_quality/plot_he_quality.py   # comparison and figure from the metrics CSV
 python code/figures/he_quality/he_crops.py           # thumbnails and crops (slow, needs the raw images)
 python code/figures/he_quality/plot_he_overview.py  # one figure with all sections and crops
+```
+
+**TLS score (paired STAY vs standard)**: TLS model of Andersson et al. (2021), coefficients in `resources/gene_lists/`; Patients 4 and 3, spots with TLS score > 0.01 on the H&E.
+
+```bash
+conda activate stay-python
+python code/figures/tls_paired/tls_paired.py   # scores per spot and the figure
 ```
 
 **Other figures**, in `code/figures/`:
