@@ -7,7 +7,7 @@ outside. The other spots form contiguous empty areas (spots connected through di
 MIN_AREA_SPOTS spots, such as small holes in the tissue, are left out. Each spot gets its distance to the tissue edge on
 the Visium array grid (100 um between neighbouring spots): empty spots to the nearest tissue spot (positive), tissue
 spots to the nearest empty spot (negative, down to MIN_DISTANCE_UM, for scale). UMIs and detected genes come from the
-raw matrix. Per section, the median per grid distance is taken, absolute and as % drop from the section's median
+raw matrix. Per section, the median per grid distance is taken, absolute and as % of the section's median
 tissue spot; per cohort, the median and interquartile range over sections are plotted. Sections in
 EXCLUDED_SECTIONS (tissue missed by Space Ranger's mask) are left out, and their maps from earlier runs deleted.
 
@@ -48,7 +48,7 @@ METRICS = {"total_counts": "UMIs per spot", "n_genes": "Genes per spot"}
 
 
 def section_profile(sample_id: str) -> pd.DataFrame | None:
-    """Median UMIs and genes per distance from the tissue edge, absolute and as % drop from the tissue median."""
+    """Median UMIs and genes per distance from the tissue edge, absolute and as % of the tissue median."""
     if sample_id in EXCLUDED_SECTIONS:
         (RESULTS / "sections" / f"{sample_id}.png").unlink(missing_ok=True)  # map from an earlier run
         print(f"{sample_id}: excluded (tissue mask)", flush=True)
@@ -87,7 +87,7 @@ def section_profile(sample_id: str) -> pd.DataFrame | None:
     out = shown.groupby("distance_um")[list(METRICS)].median()
     out.insert(0, "n_spots", shown.groupby("distance_um").size())
     for metric in METRICS:
-        out[f"{metric}_drop_pct"] = 100 - 100 * out[metric] / spots.loc[tissue, metric].median()
+        out[f"{metric}_pct_tissue"] = 100 * out[metric] / spots.loc[tissue, metric].median()
     return out.reset_index().assign(sample_id=sample_id, cohort=COHORT[sample_id])
 
 
@@ -132,7 +132,7 @@ def main() -> None:
     apply_style()
     fig, axs = plt.subplots(2, 2, figsize=(5.0, 4.2), layout="constrained")
     for col, (metric, label) in enumerate(METRICS.items()):
-        rows = [(metric, label), (f"{metric}_drop_pct", f"{label}\n(% drop from tissue)")]
+        rows = [(metric, label), (f"{metric}_pct_tissue", f"{label}\n(% of tissue median)")]
         for row, (column, ylabel) in enumerate(rows):
             ax = axs[row, col]
             for cohort in ["standard", "STAY"]:
@@ -143,7 +143,7 @@ def main() -> None:
                 ax.plot(stats.index, stats[0.5], "o-", color=color, markersize=2, linewidth=1,
                         markeredgecolor="black", markeredgewidth=0.3, label=f"{cohort} (n = {n.get(cohort, 0)})")
             ax.axvline(0, color="grey", linewidth=0.6, linestyle="--")  # tissue edge
-            ax.set(yscale="log" if row == 0 else "linear", ylabel=ylabel,
+            ax.set(yscale="log", ylabel=ylabel,
                    xlim=(MIN_DISTANCE_UM - SPOT_PITCH_UM / 2, MAX_DISTANCE_UM + SPOT_PITCH_UM / 2))
             if row == 1:
                 ax.set_xlabel("Distance from tissue edge (µm)")
