@@ -4,8 +4,9 @@
 Same logic as plot_diffusion.py, on the square 8 um grid instead of the Visium spots: tissue bins are Space Ranger's
 in_tissue bins (no detachment annotation here), the other bins form contiguous empty areas (bins connected through
 direct neighbours), and empty areas smaller than plot_diffusion.py's MIN_AREA_SPOTS Visium spots (as area) are left
-out. Each bin gets its distance to the tissue edge on the grid: empty bins to the nearest tissue bin (positive), tissue
-bins to the nearest empty bin (negative). UMIs and detected genes come from the raw 8 um matrix; per section and per
+out; for sections in VALID_EDGES, only empty bins along the listed capture-area edges count. Each bin gets its
+distance to the tissue edge on the grid: empty bins to the nearest tissue bin (positive), tissue bins to the nearest
+empty bin (negative). UMIs and detected genes come from the raw 8 um matrix; per section and per
 8 um distance step, the mean is taken (most empty bins far from the tissue have 0 UMIs, so their median is 0), absolute
 and as % of the section's mean tissue bin.
 
@@ -41,6 +42,9 @@ BINS_PER_VISIUM_SPOT = SPOT_PITCH_UM**2 * np.sqrt(3) / 2 / BIN_UM**2
 MIN_OUTSIDE_BINS = int(MIN_OUTSIDE_SPOTS * BINS_PER_VISIUM_SPOT)
 MIN_AREA_BINS = int(MIN_AREA_SPOTS * BINS_PER_VISIUM_SPOT)
 COLORS = {"patient4_HD": "#E41A1C", "patient5_HD": "#377EB8"}
+# sections where only some empty bins are glass: only those closest to these capture-area edges (as in the section
+# PNG) count as empty; the others (artefacts that Space Ranger's mask leaves out of the tissue) are ignored
+VALID_EDGES = {"patient5_HD": ("top", "left")}
 
 
 def bin_dir(section: str) -> Path:
@@ -73,16 +77,25 @@ def section_profile(section: str) -> pd.DataFrame | None:
         print(f"{section}: {(~tissue).sum()} bins outside tissue, left out", flush=True)
         return None
 
+    outside = ~tissue
+    if section in VALID_EDGES:
+        x, y = np.full(shape, np.nan), np.full(shape, np.nan)
+        x[rows, cols], y[rows, cols] = bins["hires_x"], bins["hires_y"]
+        to_edge = {"top": y - np.nanmin(y), "bottom": np.nanmax(y) - y, "left": x - np.nanmin(x),
+                   "right": np.nanmax(x) - x}
+        nearest = np.array(list(to_edge))[np.argmin(np.stack(list(to_edge.values())), axis=0)]
+        outside &= np.isin(nearest, VALID_EDGES[section])
+
     # contiguous empty areas (direct neighbours); small areas are left out
-    areas, _ = ndimage.label(~tissue)
+    areas, _ = ndimage.label(outside)
     sizes = np.bincount(areas.ravel())
-    empty = ~tissue & (sizes[areas] >= MIN_AREA_BINS)
+    empty = outside & (sizes[areas] >= MIN_AREA_BINS)
     if not empty.any():
         print(f"{section}: no empty area of >= {MIN_AREA_BINS} bins, left out", flush=True)
         return None
 
     # signed distance to the tissue edge, in um: empty bins + (to the nearest tissue bin), tissue bins - (to the
-    # nearest empty bin); bins of the small areas left out get none
+    # nearest empty bin); outside bins not used as empty (small areas, other edges) get none
     distance = np.full(shape, np.nan)
     distance[empty] = ndimage.distance_transform_edt(~tissue)[empty]
     distance[tissue] = -ndimage.distance_transform_edt(~empty)[tissue]
