@@ -41,7 +41,7 @@ MAX_DISTANCE_UM = 1000
 MIN_OUTSIDE_SPOTS = 200  # sections with fewer spots outside the tissue are left out
 MIN_AREA_SPOTS = 200  # contiguous empty areas with fewer spots (e.g. small holes in the tissue) are left out
 # sections where Space Ranger's tissue mask misses tissue, judged on results/diffusion/sections/<sample_id>.png
-EXCLUDED_SECTIONS: list[str] = []
+EXCLUDED_SECTIONS: list[str] = ["P03", "P06", "P19", "P20", "P28"]
 METRICS = {"total_counts": "UMIs per spot", "n_genes": "Genes per spot"}
 
 
