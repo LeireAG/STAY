@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Lateral diffusion: UMIs and genes in spots outside the tissue, by distance from the tissue edge, STAY vs standard.
 
-For every STAY and standard section with spots outside the tissue: tissue spots are Space Ranger's in_tissue spots plus
-the annotated detached spots (run_detachment_pipeline.py), all other spots of the capture area are outside. Each spot
-gets its distance to the tissue edge from the Visium array grid (100 um between neighbouring spots): outside spots to
-the nearest tissue spot (positive), tissue spots to the nearest outside spot (negative, down to MIN_DISTANCE_UM, for
-scale), and its UMIs and detected genes from the raw matrix. Per section, the median per DISTANCE_BIN_UM ring (with
-at least MIN_SPOTS spots) is taken, absolute and as % of the section's median tissue spot; per cohort, the median and
-interquartile range over sections are plotted.
+For every STAY and standard section with at least MIN_OUTSIDE_SPOTS spots outside the tissue: tissue spots are Space
+Ranger's in_tissue spots plus the annotated detached spots (run_detachment_pipeline.py), so detached spots are never
+outside; all other spots of the capture area are outside. Each spot gets its distance to the tissue edge from the
+Visium array grid (100 um between neighbouring spots): outside spots to the nearest tissue spot (positive), tissue
+spots to the nearest outside spot (negative, down to MIN_DISTANCE_UM, for scale), and its UMIs and detected genes from
+the raw matrix. Per section, the median per DISTANCE_BIN_UM ring (with at least MIN_SPOTS spots) is taken, absolute and
+as % of the section's median tissue spot; per cohort, the median and interquartile range over sections are plotted.
 
 Writes results/diffusion/diffusion_per_section.csv, results/diffusion/diffusion.{pdf,png} and, per section,
 results/diffusion/sections/<sample_id>.png: the spots on the hires H&E coloured by their distance to the tissue edge.
@@ -34,6 +34,7 @@ DISTANCE_BIN_UM = 100
 MIN_DISTANCE_UM = -500  # negative: inside the tissue, for scale
 MAX_DISTANCE_UM = 1000
 MIN_SPOTS = 10  # spots needed in a ring for a section's median
+MIN_OUTSIDE_SPOTS = 200  # sections with fewer spots outside the tissue are left out
 METRICS = {"total_counts": "UMIs per spot", "n_genes": "Genes per spot"}
 
 
@@ -43,7 +44,9 @@ def section_profile(sample_id: str) -> pd.DataFrame | None:
     calls = pd.read_csv(cohort_dir("detachment", sample_id) / f"{sample_id}.csv")
     spots = spots.merge(calls[["barcode", "tissue"]], on="barcode")
     spots = spots.merge(read_spot_metrics(sample_id, spots["barcode"]), on="barcode")
-    if spots["tissue"].all():
+    n_outside = int((~spots["tissue"]).sum())
+    if n_outside < MIN_OUTSIDE_SPOTS:
+        print(f"{sample_id}: {n_outside} spots outside tissue, left out", flush=True)
         return None
 
     # array grid in um: neighbours in a row are 2 columns (100 um) apart, rows are 100 * sqrt(3) / 2 um apart
@@ -69,7 +72,7 @@ def section_profile(sample_id: str) -> pd.DataFrame | None:
 
 
 def plot_section_map(sample_id: str, spots: pd.DataFrame, spots_in_range: pd.DataFrame) -> None:
-    """Spots on the hires H&E: coloured by signed distance ring (negative inside the tissue); spots further away grey."""
+    """Spots on the hires H&E coloured by signed distance ring (negative: inside the tissue), further ones grey."""
     image = read_image(cohort_dir("spaceranger", sample_id) / sample_id / "spatial/tissue_hires_image.png")
     fig, ax = plt.subplots(figsize=(4, 4))
     ax.imshow(image, alpha=0.6)
@@ -91,7 +94,7 @@ def main() -> None:
     table = pd.concat(profiles, ignore_index=True)
     table.to_csv(RESULTS / "diffusion_per_section.csv", index=False)
     n = table.groupby("cohort")["sample_id"].nunique()
-    print(f"sections with spots outside tissue: {n.to_dict()}")
+    print(f"sections with >= {MIN_OUTSIDE_SPOTS} spots outside tissue: {n.to_dict()}")
 
     apply_style()
     fig, axs = plt.subplots(2, 2, figsize=(5.0, 4.2), layout="constrained")
