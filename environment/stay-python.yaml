@@ -17,5 +17,6 @@ dependencies:
   - tifffile=2025.12.12
   - zarr=3.1.6
   - imagecodecs=2025.8.2
+  - pyarrow=26.0.0  # Visium HD tissue_positions.parquet
   - panel=1.9.4  # annotate_detachment.py, served to the browser
   - holoviews=1.23.2

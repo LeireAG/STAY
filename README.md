@@ -95,6 +95,13 @@ conda activate stay-python
 python code/figures/diffusion/plot_diffusion.py
 ```
 
+**Diffusion, Visium HD (external STAY sections)**: the same analysis on the 8 µm bins of two external Visium HD sections treated with the STAY protocol (`data/external/SIMPlex/HD/`, see its README).
+
+```bash
+conda activate stay-python
+python code/figures/diffusion/plot_diffusion_hd.py
+```
+
 **Other figures**, in `code/figures/`:
 
 | Script | Figure |
