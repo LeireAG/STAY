@@ -11,8 +11,9 @@ raw matrix. Per section, the median per grid distance is taken, absolute and as 
 per cohort, the median and interquartile range over sections are plotted. Sections in EXCLUDED_SECTIONS (tissue missed
 by Space Ranger's mask) are left out, and their maps from earlier runs deleted.
 
-Writes results/diffusion/diffusion_per_section.csv, results/diffusion/diffusion.{pdf,png} and, per section,
-results/diffusion/sections/<sample_id>.png: the spots on the hires H&E coloured by their distance to the tissue edge.
+Writes results/diffusion/standard/diffusion_per_section.csv, results/diffusion/standard/diffusion.{pdf,png} and, per
+section, results/diffusion/standard/sections/<sample_id>.png: the spots on the hires H&E coloured by their distance
+to the tissue edge, next to the CytAssist and H&E images.
 
   python code/figures/diffusion/plot_diffusion.py
 """
@@ -25,6 +26,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.ticker import MultipleLocator
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 from scipy.spatial import cKDTree
@@ -34,13 +36,13 @@ from plot_detachment_cohort import COHORT_COLORS, apply_style, read_spot_metrics
 from run_detachment_pipeline import (COHORT, PROJECT_ROOT, SAMPLES, cohort_dir, read_cytassist_image, read_image,
                                      read_spots)
 
-RESULTS = PROJECT_ROOT / "results/diffusion"
+RESULTS = PROJECT_ROOT / "results/diffusion/standard"
 SPOT_PITCH_UM = 100  # Visium centre-to-centre distance of neighbouring spots
 MIN_DISTANCE_UM = -500  # negative: inside the tissue, for scale
 MAX_DISTANCE_UM = 1000
 MIN_OUTSIDE_SPOTS = 200  # sections with fewer spots outside the tissue are left out
 MIN_AREA_SPOTS = 200  # contiguous empty areas with fewer spots (e.g. small holes in the tissue) are left out
-# sections where Space Ranger's tissue mask misses tissue, judged on results/diffusion/sections/<sample_id>.png
+# sections where Space Ranger's tissue mask misses tissue, judged on results/diffusion/standard/sections/<sample_id>.png
 EXCLUDED_SECTIONS: list[str] = ["P03", "P06", "P19", "P20", "P28"]
 METRICS = {"total_counts": "UMIs per spot", "n_genes": "Genes per spot"}
 
@@ -112,6 +114,13 @@ def plot_section_map(sample_id: str, spots: pd.DataFrame, shown: pd.DataFrame) -
     plt.close(fig)
 
 
+def distance_ticks(ax) -> None:
+    """Distance axis labelled every 100 um (vertical labels so they fit), minor ticks every 50 um."""
+    ax.xaxis.set_major_locator(MultipleLocator(100))
+    ax.xaxis.set_minor_locator(MultipleLocator(50))
+    ax.tick_params(axis="x", labelrotation=90)
+
+
 def main() -> None:
     RESULTS.mkdir(parents=True, exist_ok=True)
     profiles = [p for s in SAMPLES["sample_id"] if (p := section_profile(s)) is not None]
@@ -137,6 +146,7 @@ def main() -> None:
                    xlim=(MIN_DISTANCE_UM - SPOT_PITCH_UM / 2, MAX_DISTANCE_UM + SPOT_PITCH_UM / 2))
             if row == 1:
                 ax.set_xlabel("Distance from tissue edge (µm)")
+            distance_ticks(ax)
             style_ax(ax)
     axs[0, 0].legend(frameon=False)
     for ext in ("pdf", "png"):

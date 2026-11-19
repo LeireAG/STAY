@@ -30,7 +30,7 @@ from scipy import ndimage
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from plot_diffusion import (MAX_DISTANCE_UM, METRICS, MIN_AREA_SPOTS, MIN_DISTANCE_UM, MIN_OUTSIDE_SPOTS, PROJECT_ROOT,
-                            SPOT_PITCH_UM, apply_style, read_image, style_ax)
+                            SPOT_PITCH_UM, apply_style, distance_ticks, read_image, style_ax)
 
 HD_DIR = PROJECT_ROOT / "data/external/SIMPlex/HD"
 RESULTS = PROJECT_ROOT / "results/diffusion/hd"
@@ -136,6 +136,7 @@ def main() -> None:
             ax.set(yscale="log", ylabel=ylabel, xlim=(MIN_DISTANCE_UM - BIN_UM, MAX_DISTANCE_UM + BIN_UM))
             if row == 1:
                 ax.set_xlabel("Distance from tissue edge (µm)")
+            distance_ticks(ax)
             style_ax(ax)
     axs[0, 0].legend(frameon=False)
     for ext in ("pdf", "png"):
