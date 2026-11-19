@@ -8,7 +8,8 @@ MIN_AREA_SPOTS spots, such as small holes in the tissue, are left out. Each spot
 the Visium array grid (100 um between neighbouring spots): empty spots to the nearest tissue spot (positive), tissue
 spots to the nearest empty spot (negative, down to MIN_DISTANCE_UM, for scale). UMIs and detected genes come from the
 raw matrix. Per section, the median per grid distance is taken, absolute and as % of the section's median tissue spot;
-per cohort, the median and interquartile range over sections are plotted.
+per cohort, the median and interquartile range over sections are plotted. Sections in EXCLUDED_SECTIONS (tissue missed
+by Space Ranger's mask) are mapped but left out of the comparison.
 
 Writes results/diffusion/diffusion_per_section.csv, results/diffusion/diffusion.{pdf,png} and, per section,
 results/diffusion/sections/<sample_id>.png: the spots on the hires H&E coloured by their distance to the tissue edge.
@@ -30,7 +31,8 @@ from scipy.spatial import cKDTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "figure_2"))
 from plot_detachment_cohort import COHORT_COLORS, apply_style, read_spot_metrics, style_ax
-from run_detachment_pipeline import COHORT, PROJECT_ROOT, SAMPLES, cohort_dir, read_image, read_spots
+from run_detachment_pipeline import (COHORT, PROJECT_ROOT, SAMPLES, cohort_dir, read_cytassist_image, read_image,
+                                     read_spots)
 
 RESULTS = PROJECT_ROOT / "results/diffusion"
 SPOT_PITCH_UM = 100  # Visium centre-to-centre distance of neighbouring spots
@@ -38,6 +40,8 @@ MIN_DISTANCE_UM = -500  # negative: inside the tissue, for scale
 MAX_DISTANCE_UM = 1000
 MIN_OUTSIDE_SPOTS = 200  # sections with fewer spots outside the tissue are left out
 MIN_AREA_SPOTS = 200  # contiguous empty areas with fewer spots (e.g. small holes in the tissue) are left out
+# sections where Space Ranger's tissue mask misses tissue, judged on results/diffusion/sections/<sample_id>.png
+EXCLUDED_SECTIONS: list[str] = []
 METRICS = {"total_counts": "UMIs per spot", "n_genes": "Genes per spot"}
 
 
@@ -73,6 +77,9 @@ def section_profile(sample_id: str) -> pd.DataFrame | None:
     spots["distance_um"] = spots["distance_um"].round(1)
     shown = spots[spots["distance_um"].between(MIN_DISTANCE_UM, MAX_DISTANCE_UM)]
     plot_section_map(sample_id, spots, shown)
+    if sample_id in EXCLUDED_SECTIONS:
+        print(f"{sample_id}: excluded (tissue mask)", flush=True)
+        return None
 
     out = shown.groupby("distance_um")[list(METRICS)].median()
     out.insert(0, "n_spots", shown.groupby("distance_um").size())
@@ -82,9 +89,10 @@ def section_profile(sample_id: str) -> pd.DataFrame | None:
 
 
 def plot_section_map(sample_id: str, spots: pd.DataFrame, shown: pd.DataFrame) -> None:
-    """Spots on the hires H&E coloured by distance to the tissue edge (negative: inside); the others grey."""
+    """Spots on the hires H&E coloured by distance to the tissue edge (negative: inside; the others grey), next to
+    the CytAssist and H&E images, to check the tissue mask."""
     image = read_image(cohort_dir("spaceranger", sample_id) / sample_id / "spatial/tissue_hires_image.png")
-    fig, ax = plt.subplots(figsize=(4, 4))
+    fig, (ax, ax_cyt, ax_he) = plt.subplots(1, 3, figsize=(12, 4), layout="constrained")
     ax.imshow(image, alpha=0.6)
     beyond = spots.drop(shown.index)
     ax.scatter(beyond["hires_x"], beyond["hires_y"], s=1, color="lightgrey", linewidths=0)
@@ -92,9 +100,14 @@ def plot_section_map(sample_id: str, spots: pd.DataFrame, shown: pd.DataFrame) -
                       cmap="viridis", vmin=MIN_DISTANCE_UM, vmax=MAX_DISTANCE_UM, linewidths=0)
     fig.colorbar(dots, ax=ax, shrink=0.6, label="Distance from tissue edge (µm)")
     ax.set_title(f"{sample_id} ({COHORT[sample_id]})")
-    ax.set_axis_off()
+    ax_cyt.imshow(read_cytassist_image(sample_id))
+    ax_cyt.set_title("CytAssist")
+    ax_he.imshow(image)
+    ax_he.set_title("H&E")
+    for a in (ax, ax_cyt, ax_he):
+        a.set_axis_off()
     (RESULTS / "sections").mkdir(parents=True, exist_ok=True)
-    fig.savefig(RESULTS / "sections" / f"{sample_id}.png", dpi=200, bbox_inches="tight")
+    fig.savefig(RESULTS / "sections" / f"{sample_id}.png", dpi=200)
     plt.close(fig)
 
 
