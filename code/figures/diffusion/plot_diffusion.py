@@ -9,7 +9,7 @@ the Visium array grid (100 um between neighbouring spots): empty spots to the ne
 spots to the nearest empty spot (negative, down to MIN_DISTANCE_UM, for scale). UMIs and detected genes come from the
 raw matrix. Per section, the median per grid distance is taken, absolute and as % of the section's median tissue spot;
 per cohort, the median and interquartile range over sections are plotted. Sections in EXCLUDED_SECTIONS (tissue missed
-by Space Ranger's mask) are mapped but left out of the comparison.
+by Space Ranger's mask) are left out, and their maps from earlier runs deleted.
 
 Writes results/diffusion/diffusion_per_section.csv, results/diffusion/diffusion.{pdf,png} and, per section,
 results/diffusion/sections/<sample_id>.png: the spots on the hires H&E coloured by their distance to the tissue edge.
@@ -47,6 +47,10 @@ METRICS = {"total_counts": "UMIs per spot", "n_genes": "Genes per spot"}
 
 def section_profile(sample_id: str) -> pd.DataFrame | None:
     """Median UMIs and genes per distance from the tissue edge, absolute and as % of the tissue median."""
+    if sample_id in EXCLUDED_SECTIONS:
+        (RESULTS / "sections" / f"{sample_id}.png").unlink(missing_ok=True)  # map from an earlier run
+        print(f"{sample_id}: excluded (tissue mask)", flush=True)
+        return None
     spots = read_spots(cohort_dir("spaceranger", sample_id) / sample_id)
     calls = pd.read_csv(cohort_dir("detachment", sample_id) / f"{sample_id}.csv")
     spots = spots.merge(calls[["barcode", "tissue"]], on="barcode")
@@ -77,9 +81,6 @@ def section_profile(sample_id: str) -> pd.DataFrame | None:
     spots["distance_um"] = spots["distance_um"].round(1)
     shown = spots[spots["distance_um"].between(MIN_DISTANCE_UM, MAX_DISTANCE_UM)]
     plot_section_map(sample_id, spots, shown)
-    if sample_id in EXCLUDED_SECTIONS:
-        print(f"{sample_id}: excluded (tissue mask)", flush=True)
-        return None
 
     out = shown.groupby("distance_um")[list(METRICS)].median()
     out.insert(0, "n_spots", shown.groupby("distance_um").size())
