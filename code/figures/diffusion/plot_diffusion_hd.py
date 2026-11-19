@@ -4,9 +4,9 @@
 Same logic as plot_diffusion.py, on the square 8 um grid instead of the Visium spots: tissue bins are Space Ranger's
 in_tissue bins (no detachment annotation here), the other bins form contiguous empty areas (bins connected through
 direct neighbours), and empty areas smaller than plot_diffusion.py's MIN_AREA_SPOTS Visium spots (as area) are left
-out; for sections in VALID_EDGES, only empty bins along the listed capture-area edges count. Each bin gets its
-distance to the tissue edge on the grid: empty bins to the nearest tissue bin (positive), tissue bins to the nearest
-empty bin (negative). UMIs and detected genes come from the raw 8 um matrix; per section and per
+out. Bins selected by hand as artefacts (<section>/ARTEFACT_FILE, optional) count as neither. Each bin gets its
+distance to the tissue edge on the grid: empty bins to the nearest tissue or artefact bin (positive), tissue bins to
+the nearest empty bin (negative). UMIs and detected genes come from the raw 8 um matrix; per section and per
 8 um distance step, the mean is taken (most empty bins far from the tissue have 0 UMIs, so their median is 0), absolute
 and as % of the section's mean tissue bin.
 
@@ -42,9 +42,9 @@ BINS_PER_VISIUM_SPOT = SPOT_PITCH_UM**2 * np.sqrt(3) / 2 / BIN_UM**2
 MIN_OUTSIDE_BINS = int(MIN_OUTSIDE_SPOTS * BINS_PER_VISIUM_SPOT)
 MIN_AREA_BINS = int(MIN_AREA_SPOTS * BINS_PER_VISIUM_SPOT)
 COLORS = {"patient4_HD": "#E41A1C", "patient5_HD": "#377EB8"}
-# sections where only some empty bins are glass: only those closest to these capture-area edges (as in the section
-# PNG) count as empty; the others (artefacts that Space Ranger's mask leaves out of the tissue) are ignored
-VALID_EDGES = {"patient5_HD": ("top", "left")}
+# optional, per section: bins selected by hand in Loupe (cloupe_008um.cloupe, lasso, export as CSV with a Barcode
+# column) as artefacts, e.g. tissue that Space Ranger's mask leaves out; they count as neither tissue nor empty
+ARTEFACT_FILE = "artefact_bins.csv"
 
 
 def bin_dir(section: str) -> Path:
@@ -73,18 +73,15 @@ def section_profile(section: str) -> pd.DataFrame | None:
     rows, cols = bins["array_row"].to_numpy(), bins["array_col"].to_numpy()
     tissue = np.zeros(shape, bool)
     tissue[rows, cols] = bins["in_tissue"].astype(bool)
-    if (~tissue).sum() < MIN_OUTSIDE_BINS:
-        print(f"{section}: {(~tissue).sum()} bins outside tissue, left out", flush=True)
+    artefact = np.zeros(shape, bool)
+    if (path := HD_DIR / section / ARTEFACT_FILE).exists():
+        artefact[rows, cols] = bins["barcode"].isin(pd.read_csv(path)["Barcode"])
+        print(f"{section}: {artefact.sum()} artefact bins left out ({path.name})", flush=True)
+        tissue &= ~artefact
+    outside = ~tissue & ~artefact
+    if outside.sum() < MIN_OUTSIDE_BINS:
+        print(f"{section}: {outside.sum()} bins outside tissue, left out", flush=True)
         return None
-
-    outside = ~tissue
-    if section in VALID_EDGES:
-        x, y = np.full(shape, np.nan), np.full(shape, np.nan)
-        x[rows, cols], y[rows, cols] = bins["hires_x"], bins["hires_y"]
-        to_edge = {"top": y - np.nanmin(y), "bottom": np.nanmax(y) - y, "left": x - np.nanmin(x),
-                   "right": np.nanmax(x) - x}
-        nearest = np.array(list(to_edge))[np.argmin(np.stack(list(to_edge.values())), axis=0)]
-        outside &= np.isin(nearest, VALID_EDGES[section])
 
     # contiguous empty areas (direct neighbours); small areas are left out
     areas, _ = ndimage.label(outside)
@@ -95,9 +92,10 @@ def section_profile(section: str) -> pd.DataFrame | None:
         return None
 
     # signed distance to the tissue edge, in um: empty bins + (to the nearest tissue bin), tissue bins - (to the
-    # nearest empty bin); outside bins not used as empty (small areas, other edges) get none
+    # nearest empty bin); artefacts lie in the tissue, so they count as tissue edge for the empty bins; outside bins
+    # not used as empty (small areas) and artefacts get none
     distance = np.full(shape, np.nan)
-    distance[empty] = ndimage.distance_transform_edt(~tissue)[empty]
+    distance[empty] = ndimage.distance_transform_edt(~(tissue | artefact))[empty]
     distance[tissue] = -ndimage.distance_transform_edt(~empty)[tissue]
     bins["distance_um"] = np.round(distance[rows, cols]) * BIN_UM
     shown = bins[bins["distance_um"].between(MIN_DISTANCE_UM, MAX_DISTANCE_UM)]
@@ -105,9 +103,8 @@ def section_profile(section: str) -> pd.DataFrame | None:
 
     out = shown.groupby("distance_um")[list(METRICS)].mean()
     out.insert(0, "n_bins", shown.groupby("distance_um").size())
-    in_tissue = bins["in_tissue"].astype(bool)
     for metric in METRICS:
-        out[f"{metric}_pct_tissue"] = 100 * out[metric] / bins.loc[in_tissue, metric].mean()
+        out[f"{metric}_pct_tissue"] = 100 * out[metric] / bins.loc[tissue[rows, cols], metric].mean()
     return out.reset_index().assign(section=section)
 
 
