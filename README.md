@@ -88,6 +88,13 @@ conda activate stay-python
 python code/figures/tls_paired/tls_paired.py   # scores per spot and the figure
 ```
 
+**Diffusion (STAY vs standard)**: UMIs and genes in spots outside the tissue (raw matrix), by distance from the nearest tissue spot (Space Ranger tissue spots plus annotated detached spots; needs the Figure 2 detachment calls).
+
+```bash
+conda activate stay-python
+python code/figures/diffusion/plot_diffusion.py
+```
+
 **Other figures**, in `code/figures/`:
 
 | Script | Figure |
