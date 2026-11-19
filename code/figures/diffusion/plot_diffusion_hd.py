@@ -143,7 +143,7 @@ def main() -> None:
             for section, profile in table.groupby("section"):
                 ax.plot(profile["distance_um"], profile[column], color=COLORS[section], linewidth=1, label=section)
             ax.axvline(0, color="grey", linewidth=0.6, linestyle="--")  # tissue edge
-            ax.set(yscale="log", ylabel=ylabel,
+            ax.set(yscale="log" if row == 0 else "linear", ylabel=ylabel,
                    xlim=(MIN_DISTANCE_UM - BIN_UM, MAX_DISTANCE_UM + BIN_UM))
             if row == 1:
                 ax.set_xlabel("Distance from tissue edge (µm)")

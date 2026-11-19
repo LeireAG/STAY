@@ -143,7 +143,7 @@ def main() -> None:
                 ax.plot(stats.index, stats[0.5], "o-", color=color, markersize=2, linewidth=1,
                         markeredgecolor="black", markeredgewidth=0.3, label=f"{cohort} (n = {n.get(cohort, 0)})")
             ax.axvline(0, color="grey", linewidth=0.6, linestyle="--")  # tissue edge
-            ax.set(yscale="log", ylabel=ylabel,
+            ax.set(yscale="log" if row == 0 else "linear", ylabel=ylabel,
                    xlim=(MIN_DISTANCE_UM - SPOT_PITCH_UM / 2, MAX_DISTANCE_UM + SPOT_PITCH_UM / 2))
             if row == 1:
                 ax.set_xlabel("Distance from tissue edge (µm)")
