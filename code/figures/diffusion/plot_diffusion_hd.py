@@ -147,6 +147,7 @@ def main() -> None:
                    xlim=(MIN_DISTANCE_UM - BIN_UM, MAX_DISTANCE_UM + BIN_UM))
             if row == 1:
                 ax.set_xlabel("Distance from tissue edge (µm)")
+                ax.yaxis.set_major_formatter("{x:g}%")
             distance_ticks(ax)
             style_ax(ax)
     axs[0, 0].legend(frameon=False)
