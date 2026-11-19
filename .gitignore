@@ -10,3 +10,4 @@ __pycache__/
 !/results/README.md
 
 /internal/
+data/external/SIMPlex/HD/**

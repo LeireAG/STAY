@@ -19,3 +19,8 @@ dependencies:
   - imagecodecs=2025.8.2
   - panel=1.9.4  # annotate_detachment.py, served to the browser
   - holoviews=1.23.2
+  - pip=26.2.1
+  - pip:
+      # Visium HD tissue_positions.parquet; the pip wheel bundles its own Arrow libraries (the conda package
+      # conflicts with py-opencv's dependencies)
+      - pyarrow==26.0.0

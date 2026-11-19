@@ -88,6 +88,20 @@ conda activate stay-python
 python code/figures/tls_paired/tls_paired.py   # scores per spot and the figure
 ```
 
+**Diffusion (STAY vs standard)**: UMIs and genes in spots outside the tissue (raw matrix), by distance from the nearest tissue spot (Space Ranger tissue spots plus annotated detached spots; needs the Figure 2 detachment calls).
+
+```bash
+conda activate stay-python
+python code/figures/diffusion/plot_diffusion.py
+```
+
+**Diffusion, Visium HD (external STAY sections)**: the same analysis on the 8 µm bins of two external Visium HD sections treated with the STAY protocol (`data/external/SIMPlex/HD/`, see its README).
+
+```bash
+conda activate stay-python
+python code/figures/diffusion/plot_diffusion_hd.py
+```
+
 **Other figures**, in `code/figures/`:
 
 | Script | Figure |
