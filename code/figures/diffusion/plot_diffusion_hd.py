@@ -8,7 +8,7 @@ out. Sections in TOP_LEFT_HALF are sliced along a diagonal and only their top-le
 distance to the tissue edge on the grid: empty bins to the nearest tissue bin (positive), tissue bins to
 the nearest empty bin (negative). UMIs and detected genes come from the raw 8 um matrix; per section and per
 8 um distance step, the mean is taken (most empty bins far from the tissue have 0 UMIs, so their median is 0), absolute
-and as % of the section's mean tissue bin.
+and as % drop from the section's mean tissue bin.
 
 Writes results/diffusion/hd/diffusion_hd_per_section.csv, results/diffusion/hd/diffusion_hd.{pdf,png} and, per section,
 results/diffusion/hd/sections/<section>.png: the bins on the hires H&E coloured by distance, next to the CytAssist and
@@ -67,7 +67,7 @@ def read_bins(section: str) -> pd.DataFrame:
 
 
 def section_profile(section: str) -> pd.DataFrame | None:
-    """Mean UMIs and genes per distance from the tissue edge, absolute and as % of the tissue mean."""
+    """Mean UMIs and genes per distance from the tissue edge, absolute and as % drop from the tissue mean."""
     bins = read_bins(section)
     shape = (bins["array_row"].max() + 1, bins["array_col"].max() + 1)
     rows, cols = bins["array_row"].to_numpy(), bins["array_col"].to_numpy()
@@ -103,7 +103,7 @@ def section_profile(section: str) -> pd.DataFrame | None:
     out = shown.groupby("distance_um")[list(METRICS)].mean()
     out.insert(0, "n_bins", shown.groupby("distance_um").size())
     for metric in METRICS:
-        out[f"{metric}_pct_tissue"] = 100 * out[metric] / bins.loc[(tissue & keep)[rows, cols], metric].mean()
+        out[f"{metric}_drop_pct"] = 100 - 100 * out[metric] / bins.loc[(tissue & keep)[rows, cols], metric].mean()
     return out.reset_index().assign(section=section)
 
 
@@ -137,12 +137,14 @@ def main() -> None:
     fig, axs = plt.subplots(2, 2, figsize=(5.0, 4.2), layout="constrained")
     for col, (metric, label) in enumerate(METRICS.items()):
         label = label.replace("spot", "8 µm bin")
-        for row, (column, ylabel) in enumerate([(metric, label), (f"{metric}_pct_tissue", f"{label}\n(% of tissue)")]):
+        rows = [(metric, label), (f"{metric}_drop_pct", f"{label}\n(% drop from tissue)")]
+        for row, (column, ylabel) in enumerate(rows):
             ax = axs[row, col]
             for section, profile in table.groupby("section"):
                 ax.plot(profile["distance_um"], profile[column], color=COLORS[section], linewidth=1, label=section)
             ax.axvline(0, color="grey", linewidth=0.6, linestyle="--")  # tissue edge
-            ax.set(yscale="log", ylabel=ylabel, xlim=(MIN_DISTANCE_UM - BIN_UM, MAX_DISTANCE_UM + BIN_UM))
+            ax.set(yscale="log" if row == 0 else "linear", ylabel=ylabel,
+                   xlim=(MIN_DISTANCE_UM - BIN_UM, MAX_DISTANCE_UM + BIN_UM))
             if row == 1:
                 ax.set_xlabel("Distance from tissue edge (µm)")
             distance_ticks(ax)
